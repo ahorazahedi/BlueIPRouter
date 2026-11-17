@@ -70,4 +70,39 @@ enum SelfTest {
         }
         exit(0)
     }
+
+    /// `BlueIPRouter --speedtest-quick`: a 3-second check of each speed-test engine on the direct and default paths (~20–60 MB).
+    @MainActor
+    static func quickSpeed() async {
+        let snap = await Task.detached { NetworkScanner.scan() }.value
+        let available = await Probes.availableInterfaces()
+        let lan = snap.interfaces.first { $0.kind.isPhysical && $0.isActive && $0.router != nil }
+        let direct = lan.flatMap { l in available.first { $0.name == l.name } }
+        let libre = (try? await LibreSpeedDirectory.servers()) ?? []
+        print("librespeed servers: \(libre.count)")
+        var servers = [SpeedServer.cloudflare]
+        if let first = libre.first { servers.append(first) }
+        for (label, iface) in [("direct \(direct?.name ?? "-")", direct), ("default", nil)] {
+            for server in servers {
+                var pings: [Double] = []
+                for _ in 0..<3 { if let p = await SpeedIO.ping(server: server, interface: iface) { pings.append(p) } }
+                let flag = CancelFlag()
+                let down = ByteCounter(), up = ByteCounter()
+                let t0 = Date(), d1 = t0.addingTimeInterval(3)
+                await withTaskGroup(of: Void.self) { g in
+                    for _ in 0..<2 { g.addTask { try? await SpeedIO.download(server: server, bytes: 25_000_000, interface: iface, counter: down, deadline: d1, cancel: flag) } }
+                }
+                let dt = Date().timeIntervalSince(t0)
+                let t1 = Date(), d2 = t1.addingTimeInterval(2)
+                var upErr = ""
+                do { try await SpeedIO.upload(server: server, bytes: 5_000_000, interface: iface, counter: up, deadline: d2, cancel: flag) } catch { upErr = " (\(error.localizedDescription))" }
+                let ut = Date().timeIntervalSince(t1)
+                print(String(format: "%@ | %@ | ping %@ | down %.1f Mbps (%.1f MB) | up %.1f Mbps (%.1f MB)%@", label, server.name,
+                             pings.isEmpty ? "-" : String(format: "%.0f ms", pings.min()!),
+                             Double(down.value) * 8 / 1e6 / dt, Double(down.value) / 1e6,
+                             Double(up.value) * 8 / 1e6 / ut, Double(up.value) / 1e6, upErr))
+            }
+        }
+        exit(0)
+    }
 }

@@ -26,8 +26,9 @@ jobs:
       - name: Swift version
         run: swift --version
 
-      - name: Build universal app (Apple Silicon + Intel)
-        run: UNIVERSAL=1 BUILD_NUMBER=${{ github.run_number }} sh scripts/build.sh --zip
+      # Apple Silicon only. Intel users can build with: UNIVERSAL=1 sh scripts/build.sh
+      - name: Build app (Apple Silicon)
+        run: BUILD_NUMBER=${{ github.run_number }} sh scripts/build.sh --zip
 
       - name: Check generated pf rules parse
         run: |

@@ -236,6 +236,7 @@ struct MenuBarView: View {
             HStack(spacing: 8) {
                 Button("Open BlueIPRouter") { open(nil) }
                 Button("Check a Path…") { open(.pathCheck) }
+                Button { open(.speedTest) } label: { Image(systemName: "speedometer") }.help("Run a speed test")
                 Spacer()
                 Button { Task { await model.refresh(); await model.refreshPublicIPs() } } label: {
                     if model.publicIPLoading { ProgressView().controlSize(.small) } else { Image(systemName: "arrow.clockwise") }

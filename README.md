@@ -17,6 +17,7 @@ Built with SwiftUI. Requires macOS 14 or later.
 | **Network Adapters** | Addresses, MAC, router, DNS, traffic counters and aliases per interface. Turn an interface up or down, Wi-Fi power, renew DHCP, set the MTU, set DNS servers, flush the DNS cache |
 | **Persistence** | A background service that re-applies everything at boot and on a schedule: it re-resolves domains, follows router changes and repairs missing routes. Startup switches for the service, Open at Login and the menu bar icon |
 | **Menu bar** | Public IPv4/IPv6 with flag, location and ISP, live download/upload speed, egress interface, profile, kill switch and Apply, without opening the window. The bar can show an icon, the country flag, flag + IP, or live speed. The app keeps running there when its window is closed |
+| **Speed Test** | Download, upload, ping, jitter and latency under load (bufferbloat) against Cloudflare (default) or LibreSpeed servers. Runs on the connection you pick: directly over Wi-Fi/Ethernet past the VPN (default), the system default path (e.g. through the VPN), or another interface. Shows the public IP of the tested path and keeps a history chart. Uses roughly 100–300 MB of data per test, and the app warns you first |
 | **Connections** | Live list of which app talks to which address and through which interface, with a filter for traffic leaving outside the VPN tunnel |
 | **Traffic** | Per-interface throughput charts (15 min to 7 days) and totals: how much goes through the VPN tunnel, Wi-Fi and other links |
 | **Profiles** | Named sets of active rules (e.g. Home, Office, Travel), chosen by hand or automatically by the network you join (recognised by the router, no location permission needed), with an optional kill-switch setting per profile |
@@ -31,7 +32,7 @@ Built with SwiftUI. Requires macOS 14 or later.
 
 No Terminal needed.
 
-1. Download `BlueIPRouter-<version>.zip` from the [latest release](https://github.com/ahorazahedi/BlueIPRouter/releases/latest) and unzip it.
+1. Download `BlueIPRouter-<version>.zip` from the [latest release] (Apple Silicon; Intel Macs see *Build from source*)(https://github.com/ahorazahedi/BlueIPRouter/releases/latest) and unzip it.
 2. Drag **BlueIPRouter.app** into **Applications**.
 3. Open it. The first time, macOS may say it cannot verify the developer, because the app is not notarized. Click **Done**, then open **System Settings › Privacy & Security**, scroll down and click **Open Anyway** next to BlueIPRouter.
 4. The **Setup Assistant** opens. Install the background service (one administrator password), choose whether the app opens at login, and import any static routes you already have.
@@ -53,9 +54,10 @@ git clone https://github.com/ahorazahedi/BlueIPRouter.git && cd BlueIPRouter
 sh scripts/build.sh --install                     # builds and copies BlueIPRouter.app to ~/Applications
 sh scripts/build.sh --zip                         # also creates build/BlueIPRouter-<version>.zip
 BUNDLE_ID=com.example.blueiprouter sh scripts/build.sh   # use your own bundle identifier
+UNIVERSAL=1 sh scripts/build.sh                  # Apple Silicon + Intel (Intel Macs: build it yourself)
 ```
 
-Every push to `main` makes GitHub Actions build a universal app (Apple Silicon + Intel) and publish it on the release named after the version in `Sources/BlueIPRouterCore/Models.swift`. If you bump that version, a new release is created. Otherwise the zip on the current release is replaced with the newest build.
+Every push to `main` makes GitHub Actions build the app for Apple Silicon and publish it on the release named after the version in `Sources/BlueIPRouterCore/Models.swift`. If you bump that version, a new release is created. Otherwise the zip on the current release is replaced with the newest build.
 
 ## How it works
 

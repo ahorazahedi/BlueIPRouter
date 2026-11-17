@@ -5,7 +5,7 @@ import Observation
 import UniformTypeIdentifiers
 
 enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
-    case dashboard, connections, traffic, rules, profiles, killSwitch, blockList, routes, pathCheck, dns, adapters, automation, service, backup, activity, about
+    case dashboard, connections, traffic, speedTest, rules, profiles, killSwitch, blockList, routes, pathCheck, dns, adapters, automation, service, backup, activity, about
 
     var id: String { rawValue }
     var title: String {
@@ -13,6 +13,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .dashboard: return "Dashboard"
         case .connections: return "Connections"
         case .traffic: return "Traffic"
+        case .speedTest: return "Speed Test"
         case .profiles: return "Profiles"
         case .blockList: return "Block List"
         case .dns: return "DNS"
@@ -33,6 +34,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .dashboard: return "gauge.with.dots.needle.67percent"
         case .connections: return "point.3.filled.connected.trianglepath.dotted"
         case .traffic: return "chart.xyaxis.line"
+        case .speedTest: return "speedometer"
         case .profiles: return "square.stack.3d.up"
         case .blockList: return "nosign"
         case .dns: return "server.rack"
@@ -119,6 +121,7 @@ final class AppModel {
     var loginItemNeedsApproval = LoginItem.needsApproval
 
     var traffic = TrafficHistory.load()
+    let speedTest = SpeedTestRunner()
     var availableUpdate: AvailableUpdate?
     var checkingForUpdates = false
     private var lastEgress: String?
@@ -310,6 +313,29 @@ final class AppModel {
     func blockAndApply(_ value: String, note: String = "") async {
         block(value, note: note)
         await apply(title: "block \(value)")
+    }
+
+    /// Connections a speed test can run on: direct over the LAN link (default), the system default path
+    /// (e.g. through the VPN) and any other interface macOS lets apps pin to.
+    func speedTestPaths() async -> [SpeedPath] {
+        let available = await Probes.availableInterfaces()
+        var out: [SpeedPath] = []
+        let egress = net.internetRoute?.interface
+        if let lan = localInterface, let nw = available.first(where: { $0.name == lan.name }) {
+            out.append(SpeedPath(id: "direct", title: "Direct over \(displayName(lan.name)) (\(lan.name))",
+                                 detail: "Bypasses the VPN: your ISP's raw speed, the same way your direct rules reach the internet.",
+                                 interfaceName: lan.name, nw: nw))
+        }
+        out.append(SpeedPath(id: "default", title: "System default" + (egress.map { " — through \(displayName($0)) (\($0))" } ?? ""),
+                             detail: "What your apps get right now, e.g. through the full-tunnel VPN.", interfaceName: egress, nw: nil))
+        for i in net.interfaces where i.isActive && i.ipv4 != nil && (i.kind.isVPN || i.kind.isPhysical)
+            && i.name != localInterface?.name && i.name != egress {
+            if let nw = available.first(where: { $0.name == i.name }) {
+                out.append(SpeedPath(id: i.name, title: "\(displayName(i.name)) (\(i.name))",
+                                     detail: "Pinned to this interface. It must have internet access.", interfaceName: i.name, nw: nw))
+            }
+        }
+        return out
     }
 
     func describe(_ action: TriggerAction) -> String {

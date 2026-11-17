@@ -12,6 +12,7 @@ struct RootView: View {
                     row(.dashboard)
                     row(.connections)
                     row(.traffic)
+                    row(.speedTest)
                 }
                 Section("Routing") {
                     row(.rules, badge: model.pendingChanges.count)
@@ -40,6 +41,7 @@ struct RootView: View {
                 case .dashboard: DashboardView()
                 case .connections: ConnectionsView()
                 case .traffic: TrafficView()
+                case .speedTest: SpeedTestView()
                 case .profiles: ProfilesView()
                 case .blockList: BlockListView()
                 case .dns: DNSView()
