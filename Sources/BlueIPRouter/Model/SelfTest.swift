@@ -1,5 +1,7 @@
+import AppKit
 import BlueIPRouterCore
 import Foundation
+import SwiftUI
 
 /// `BlueIPRouter --selftest` prints what the app sees (no UI, no privileges, no changes) and exits.
 /// Useful for bug reports: it shows interface detection, path analysis, pf rule generation and public IPs.
@@ -104,5 +106,28 @@ enum SelfTest {
             }
         }
         exit(0)
+    }
+
+    /// `BlueIPRouter --render-dial <folder>`: renders the speed gauge in a few states to PNGs (design check).
+    @MainActor
+    static func renderDial(to folder: String) {
+        let states: [(String, Double, SpeedUnit, SpeedDial.Style, Bool)] = [
+            ("idle", 0, .mbps, .idle, false), ("download-24", 24.1, .mbps, .download, true),
+            ("upload-180", 180, .mbps, .upload, true), ("done-MBps", 56, .mBps, .done, false),
+        ]
+        for (name, v, unit, style, active) in states {
+            let view = SpeedDial(mbps: v, unit: unit, style: style, active: active)
+                .frame(width: 320, height: 300)
+                .padding(20)
+                .background(Color(red: 0.12, green: 0.12, blue: 0.13))
+                .environment(\.colorScheme, .dark)
+            let r = ImageRenderer(content: view)
+            r.scale = 2
+            if let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+               let png = rep.representation(using: .png, properties: [:]) {
+                try? png.write(to: URL(fileURLWithPath: folder).appendingPathComponent("dial-\(name).png"))
+            }
+        }
+        print("rendered to \(folder)")
     }
 }

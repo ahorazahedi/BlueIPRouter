@@ -6,6 +6,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if CommandLine.arguments.contains("--selftest") { Task { await SelfTest.run() } ; return }
         if CommandLine.arguments.contains("--speedtest-quick") { Task { await SelfTest.quickSpeed() } ; return }
+        if let i = CommandLine.arguments.firstIndex(of: "--render-dial"), i + 1 < CommandLine.arguments.count {
+            Task { @MainActor in SelfTest.renderDial(to: CommandLine.arguments[i + 1]); exit(0) }
+            return
+        }
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
     }

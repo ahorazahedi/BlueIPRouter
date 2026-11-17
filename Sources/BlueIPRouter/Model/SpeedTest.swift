@@ -282,6 +282,10 @@ final class SpeedTestRunner {
 
     var phase: Phase = .idle
     var liveMbps: Double = 0
+    /// Live throughput samples (Mbps) of the current phase, for the sparkline under the dial.
+    var samples: [Double] = []
+    var downloadSamples: [Double] = []
+    var uploadSamples: [Double] = []
     var progress: Double = 0
     var pingMs: Double?
     var jitterMs: Double?
@@ -320,6 +324,7 @@ final class SpeedTestRunner {
         let flag = cancel
         phase = .server
         liveMbps = 0; progress = 0
+        samples = []; downloadSamples = []; uploadSamples = []
         pingMs = nil; jitterMs = nil; loadedPingMs = nil; downloadMbps = nil; uploadMbps = nil
         identity = nil; error = nil; serverName = nil
         task = Task { await self.run(engine: engine, libreServerID: libreServerID, path: path, geo: geo, cancel: flag) }
@@ -368,6 +373,8 @@ final class SpeedTestRunner {
             try await SpeedIO.download(server: target, bytes: 25_000_000, interface: iface, counter: counter, deadline: deadline, cancel: cancel)
         }
         guard !cancel.isCancelled else { return }
+        downloadSamples = samples
+        samples = []
         downloadMbps = down.mbps
         loadedPingMs = down.loadedPing
 
@@ -377,6 +384,7 @@ final class SpeedTestRunner {
             try await SpeedIO.upload(server: target, bytes: 10_000_000, interface: iface, counter: counter, deadline: deadline, cancel: cancel)
         }
         guard !cancel.isCancelled else { return }
+        uploadSamples = samples
         uploadMbps = up.mbps
 
         identity = await identityTask.value
@@ -445,6 +453,7 @@ final class SpeedTestRunner {
                 return out
             }
         }
+        liveMbps = 0
         var warmBytes: Int64 = 0
         var warmTime: Date?
         var lastBytes: Int64 = 0
@@ -454,6 +463,7 @@ final class SpeedTestRunner {
             let now = Date(), bytes = counter.value
             let instant = Double(bytes - lastBytes) * 8 / 1_000_000 / max(0.05, now.timeIntervalSince(lastTime))
             liveMbps = liveMbps == 0 ? instant : liveMbps * 0.7 + instant * 0.3
+            samples.append(liveMbps)
             lastBytes = bytes
             lastTime = now
             progress = min(1, now.timeIntervalSince(start) / seconds)
