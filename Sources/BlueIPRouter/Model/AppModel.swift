@@ -435,7 +435,12 @@ final class AppModel {
     /// Static routes added outside BlueIPRouter (by hand, scripts or older tools) that can become rules.
     var importCandidates: [ImportCandidate] {
         net.routesV4.compactMap { e in
-            guard e.isStatic, !e.isLinkLayer, !e.isDefault, owner(of: e) == nil, let cidr = e.cidr,
+            // Routes macOS creates for a connected interface (its subnet, its own address, the router,
+            // link-local) point at "link#N", are cloning or scoped. They are not user routes.
+            guard e.isStatic, !e.isLinkLayer, !e.isDefault, !e.isScoped, owner(of: e) == nil, let cidr = e.cidr,
+                  !e.gateway.hasPrefix("link#"), !e.flags.contains("C"), !e.flags.contains("c"),
+                  !systemAddresses.contains(cidr.address),
+                  !IPv4.contains(network: "169.254.0.0", prefix: 16, ip: cidr.address),
                   cidr.prefix >= 8, Validation.isInterfaceName(e.netif), !e.netif.hasPrefix("lo"),
                   !IPv4.contains(network: "224.0.0.0", prefix: 4, ip: cidr.address),
                   !IPv4.contains(network: "127.0.0.0", prefix: 8, ip: cidr.address),
@@ -449,6 +454,19 @@ final class AppModel {
             let dest = cidr.prefix == 32 ? cidr.address : "\(cidr.address)/\(cidr.prefix)"
             return ImportCandidate(id: e.id, destination: dest, via: via, entry: e)
         }
+    }
+
+    /// Addresses that belong to the interfaces themselves (own IPs, point-to-point peers, routers).
+    private var systemAddresses: Set<String> {
+        var out = Set<String>()
+        for i in net.interfaces {
+            for a in i.snapshot.ipv4 {
+                out.insert(a.address)
+                if let p = a.peer { out.insert(p) }
+            }
+            if let r = i.router { out.insert(r) }
+        }
+        return out
     }
 
     /// Groups the chosen routes by next hop into new rules.

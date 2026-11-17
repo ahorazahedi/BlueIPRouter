@@ -17,6 +17,10 @@ enum SelfTest {
         print("routes v4=\(snap.routesV4.count) v6=\(snap.routesV6.count) systemDNS=\(snap.systemDNS)")
         print("service: helper=\(snap.service.helperInstalled) daemon=\(snap.service.daemonInstalled) loaded=\(snap.service.loaded)")
 
+        await MainActor.run {}
+        let model = AppModel()
+        model.net = snap
+        print("import candidates: \(model.importCandidates.map { "\($0.destination) via \($0.entry.gateway)" })")
         let targets = Array(Set(rules.flatMap(\.destinations))).sorted().prefix(5) + ["1.1.1.1"]
         for t in targets {
             let r = PathAnalyzer.analyze(t, snapshot: snap, rules: rules, aliases: [:])

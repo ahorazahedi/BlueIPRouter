@@ -2,7 +2,7 @@ import Foundation
 
 /// Fixed identifiers and file locations shared by the app and the root helper.
 public enum BIR {
-    public static let version = "1.1.0"
+    public static let version = "1.1.1"
 
     public static let helperLabel = "com.blueiprouter.helper"
     public static let helperBinary = "/Library/PrivilegedHelperTools/com.blueiprouter.helper"
