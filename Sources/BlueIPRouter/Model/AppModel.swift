@@ -360,6 +360,7 @@ final class AppModel {
 
     /// The installed LaunchDaemon predates the current app (e.g. the old timer-only service).
     var daemonOutdated: Bool {
+        if net.service.helperInstalled, let v = net.service.helperVersion, v != BIR.version { return true }
         guard net.service.daemonInstalled, let installed = net.installedDaemonPlist else { return false }
         return installed != Privileged.daemonPlist(interval: workspace.settings.serviceIntervalSeconds)
     }

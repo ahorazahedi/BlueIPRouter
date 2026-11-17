@@ -21,7 +21,7 @@ struct DashboardView: View {
                 }
                 if model.daemonOutdated {
                     Banner(symbol: "arrow.triangle.2.circlepath", tint: .orange, title: "Background service needs an update",
-                           message: "This version reacts to VPN and network changes instantly and runs triggers. Update it once (administrator password).",
+                           message: "The installed helper (\(model.net.service.helperVersion ?? "older")) is older than this app (\(BIR.version)). Update it once (administrator password).",
                            actions: AnyView(Button("Update Service") { Task { await model.apply(title: "update the background service") } }.buttonStyle(.borderedProminent)))
                 }
                 PendingBanner()

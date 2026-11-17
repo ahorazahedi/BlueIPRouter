@@ -117,7 +117,9 @@ func resolveEntries(_ entries: [String], cache: inout [String: [String]]) -> (ci
         switch KSEntry.parse(raw) {
         case .cidr(let c): cidrs.append(c)
         case .domain(let d):
-            let ips = (Resolver.resolve(d, family: AF_INET, timeout: 4) ?? []) + (Resolver.resolve(d, family: AF_INET6, timeout: 3) ?? [])
+            // Without IPv6 connectivity the resolver returns IPv4-mapped ::ffff: addresses; they are not real IPv6.
+            let ips = ((Resolver.resolve(d, family: AF_INET, timeout: 4) ?? []) + (Resolver.resolve(d, family: AF_INET6, timeout: 3) ?? []))
+                .filter { !$0.lowercased().hasPrefix("::ffff:") }
             if !ips.isEmpty { cache["ks:" + d] = ips } else if cache["ks:" + d] == nil { errors.append("Could not resolve \(d)") }
             cidrs += (cache["ks:" + d] ?? []).compactMap(CIDR.normalize)
         case nil: errors.append("Ignored invalid entry \(raw)")
@@ -213,18 +215,31 @@ func applyFirewall(routes: [ManagedRoute], interfaces: [InterfaceSnapshot], cach
 
 // MARK: - Per-domain DNS (/etc/resolver)
 
-func applyResolvers(_ resolvers: [DomainResolver]) -> ResolverStatus {
+/// Resolver file that makes every lookup for a blocked domain and its subdomains fail immediately
+/// (a closed port on loopback), so names like www.example.com or uk.example.com are blocked too.
+let blockedResolverContent = BIR.resolverMarker + " (block list)\nnameserver 127.0.0.1\nport 1\ntimeout 1\n"
+
+func applyResolvers(_ resolvers: [DomainResolver], blockedDomains: [String] = []) -> ResolverStatus {
     var errors: [String] = []
     var active: [String] = []
     var changed = false
     let fm = FileManager.default
-    if !resolvers.isEmpty { try? fm.createDirectory(atPath: BIR.resolverDir, withIntermediateDirectories: true) }
+    if !resolvers.isEmpty || !blockedDomains.isEmpty { try? fm.createDirectory(atPath: BIR.resolverDir, withIntermediateDirectories: true) }
     var wanted: [String: String] = [:]
     for r in resolvers where r.enabled {
         if let e = r.validationError { errors.append(e); continue }
         let name = r.domain.lowercased()
         guard !name.contains("/"), !name.hasPrefix(".") else { continue }
         wanted[name] = r.fileContent
+    }
+    for d in blockedDomains {
+        let name = d.lowercased()
+        guard Validation.isDomain(name) else { continue }
+        if wanted[name] != nil {
+            errors.append("\(name) is both blocked and has its own name servers; the name servers win")
+            continue
+        }
+        wanted[name] = blockedResolverContent
     }
     for (name, content) in wanted {
         let path = BIR.resolverDir + "/" + name
@@ -248,7 +263,10 @@ func applyResolvers(_ resolvers: [DomainResolver]) -> ResolverStatus {
         changed = true
         log("resolver \(entry.domain) removed")
     }
-    if changed { _ = Shell.run("/usr/bin/killall", ["-HUP", "mDNSResponder"], timeout: 5) }
+    if changed {
+        _ = Shell.run("/usr/bin/dscacheutil", ["-flushcache"], timeout: 5)
+        _ = Shell.run("/usr/bin/killall", ["-HUP", "mDNSResponder"], timeout: 5)
+    }
     return ResolverStatus(active: active.sorted(), errors: errors)
 }
 
@@ -422,7 +440,11 @@ func apply(trigger: String) {
     runtime.killSwitchArmed = armed
 
     // 4. Per-domain DNS.
-    let resolvers = applyResolvers(automation.resolvers)
+    let blockedDomains = automation.blocked.filter(\.enabled).compactMap { e -> String? in
+        if case .domain(let d)? = KSEntry.parse(e.value) { return d }
+        return nil
+    }
+    let resolvers = applyResolvers(automation.resolvers, blockedDomains: blockedDomains)
 
     var status = HelperStatus(updatedAt: Date(), trigger: trigger, rules: ordered, installedRoutes: installed, killSwitch: ks)
     status.profile = ActiveProfileInfo(id: profile?.id, name: profile?.name, reason: chosen.reason)

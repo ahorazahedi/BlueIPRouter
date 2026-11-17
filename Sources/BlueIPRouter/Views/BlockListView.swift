@@ -73,11 +73,14 @@ struct BlockListView: View {
                         .font(.title2.weight(.semibold))
                     Text("Outgoing connections are refused immediately (apps see “connection refused”) and replies are dropped. Applies to this Mac on every interface, including the VPN tunnel. Uses the pf firewall, kept by the background service across reboots.")
                         .font(.callout).foregroundStyle(.secondary)
+                    Text("Blocking a domain also blocks every subdomain (www., uk., mail. …) by making their lookups fail. Browsers using their own encrypted DNS (Chrome/Firefox “Secure DNS”) can bypass that part; turn it off or block their addresses too. Pages already open may keep working until reloaded.")
+                        .font(.caption).foregroundStyle(.secondary)
                     ForEach(live?.errors ?? [], id: \.self) { Label($0, systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(.red) }
                 }
                 Spacer()
-                if pending {
-                    Button("Apply") { Task { await model.apply(title: "update the block list") } }.buttonStyle(.borderedProminent)
+                if pending || model.daemonOutdated {
+                    Button(pending ? "Apply" : "Update Service") { Task { await model.apply(title: "update the block list") } }
+                        .buttonStyle(.borderedProminent)
                 }
             }
         }
@@ -120,7 +123,7 @@ struct BlockListView: View {
         switch KSEntry.parse(e.value) {
         case .cidr(let c): return c
         case .domain:
-            return "its IPv4 and IPv6 addresses, re-resolved by the background service"
+            return "the domain and all its subdomains (lookups fail), plus its current IPs"
         case nil: return ""
         }
     }
