@@ -3,3 +3,13 @@ build/
 .swiftpm/
 .DS_Store
 *.xcodeproj/xcuserdata/
+
+# Local AI assistant files (never tracked)
+CLAUDE.md
+CLAUDE.local.md
+**/CLAUDE.md
+**/CLAUDE.local.md
+.claude/
+**/.claude/
+.claudeignore
+.mcp.json
