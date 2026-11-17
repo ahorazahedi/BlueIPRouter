@@ -1,8 +1,12 @@
 name: Build and release
 
-# Every push to main builds the app and publishes it on GitHub Releases:
+# Every push to main builds the Apple Silicon app and publishes it on GitHub Releases:
 #   - a new release v<version> when BIR.version in Models.swift changes
 #   - otherwise the zip on the existing v<version> release is replaced with the newest build
+#
+# GitHub's Apple Silicon runners are often short on capacity and drop queued jobs. To build
+# reliably, the same arm64 app is built on two runner pools at once (Apple Silicon natively,
+# Intel by cross-compiling); the publish step uses whichever finishes.
 on:
   push:
     branches: [main]
@@ -18,44 +22,78 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
-    timeout-minutes: 45
+    name: Build (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
-      - name: Swift version
-        run: swift --version
-
-      # Apple Silicon only. Intel users can build with: UNIVERSAL=1 sh scripts/build.sh
-      - name: Build app (Apple Silicon)
-        run: BUILD_NUMBER=${{ github.run_number }} sh scripts/build.sh --zip
-
-      - name: Check generated pf rules parse
+      - name: Toolchain
         run: |
+          swift --version
+          uname -m
+
+      - name: Build app (Apple Silicon)
+        run: ARCH=arm64 BUILD_NUMBER=${{ github.run_number }} sh scripts/build.sh --zip
+
+      - name: Verify bundle
+        run: |
+          lipo -info build/BlueIPRouter.app/Contents/MacOS/BlueIPRouter | grep -q arm64
+          lipo -info build/BlueIPRouter.app/Contents/MacOS/blueiprouter-helper | grep -q arm64
+          codesign -v build/BlueIPRouter.app
           printf 'table <t> persist { 192.0.2.0/24 2001:db8::/32 }\nblock return out quick to <t>\n' > /tmp/t.pf
           pfctl -nf /tmp/t.pf
 
       - uses: actions/upload-artifact@v4
         with:
-          name: BlueIPRouter
+          name: BlueIPRouter-${{ matrix.runner }}
           path: build/BlueIPRouter-*.zip
+          retention-days: 14
 
-      - name: Publish release
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+  publish:
+    name: Publish release
+    needs: build
+    # Runs if at least one build produced the app, even when the other runner never started.
+    if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: BlueIPRouter-*
+          path: artifacts
+
+      - name: Pick a build
+        id: pick
+        run: |
+          ZIP=$(ls artifacts/BlueIPRouter-macos-15/*.zip 2>/dev/null | head -1)
+          [ -n "$ZIP" ] || ZIP=$(ls artifacts/*/*.zip 2>/dev/null | head -1)
+          if [ -z "$ZIP" ]; then echo "No build finished on any runner." >&2; exit 1; fi
+          echo "Using $ZIP"
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+
+      - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' Sources/BlueIPRouterCore/Models.swift)
           TAG="v$VERSION"
-          ZIP="build/BlueIPRouter-$VERSION.zip"
+          ASSET="BlueIPRouter-$VERSION.zip"
+          cp "${{ steps.pick.outputs.zip }}" "$ASSET"
           SHORT=$(git rev-parse --short HEAD)
-          NOTES="Built from $SHORT on $(date -u '+%Y-%m-%d %H:%M UTC').
+          NOTES="Built from $SHORT on $(date -u '+%Y-%m-%d %H:%M UTC') (Apple Silicon).
 
-          Download BlueIPRouter-$VERSION.zip, unzip it and move BlueIPRouter.app to Applications.
-          The app is not notarized: on first launch open System Settings › Privacy & Security and click Open Anyway."
+          Install: download $ASSET, unzip it and move BlueIPRouter.app to Applications.
+          The app is not notarized: on first launch open System Settings › Privacy & Security and click Open Anyway.
+          Intel Macs: build from source with UNIVERSAL=1 sh scripts/build.sh."
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$ZIP" --clobber
+            gh release upload "$TAG" "$ASSET" --clobber
             gh release edit "$TAG" --notes "$NOTES"
           else
-            gh release create "$TAG" "$ZIP" --target "$GITHUB_SHA" --title "BlueIPRouter $VERSION" --notes "$NOTES" --latest
+            gh release create "$TAG" "$ASSET" --target "$GITHUB_SHA" --title "BlueIPRouter $VERSION" --notes "$NOTES" --latest
           fi

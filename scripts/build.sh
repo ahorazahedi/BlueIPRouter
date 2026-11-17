@@ -4,6 +4,7 @@
 #   sh scripts/build.sh --install  build and copy to ~/Applications
 #   sh scripts/build.sh --zip      build and package build/BlueIPRouter-<version>.zip
 #   UNIVERSAL=1 sh scripts/build.sh  Apple Silicon + Intel binary
+#   ARCH=arm64 sh scripts/build.sh   one architecture, whatever Mac builds it
 set -e
 cd "$(dirname "$0")/.."
 ROOT=$(pwd)
@@ -30,6 +31,11 @@ if [ "${UNIVERSAL:-0}" = "1" ]; then
     lipo -create "$ARM/$exe" "$X86/$exe" -output "$BIN/$exe"
   done
   lipo -info "$BIN/BlueIPRouter"
+elif [ -n "${ARCH:-}" ]; then
+  # Build for one architecture regardless of the build machine (e.g. ARCH=arm64 on an Intel Mac).
+  echo "==> Compiling (release, $ARCH)"
+  swift build -c release --triple "$ARCH-apple-macosx14.0"
+  BIN=$(swift build -c release --triple "$ARCH-apple-macosx14.0" --show-bin-path)
 else
   echo "==> Compiling (release)"
   swift build -c release
