@@ -1,34 +1,60 @@
-name: Build
+name: Build and release
 
+# Every push to main builds the app and publishes it on GitHub Releases:
+#   - a new release v<version> when BIR.version in Models.swift changes
+#   - otherwise the zip on the existing v<version> release is replaced with the newest build
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
-# Needed so tag builds can create the GitHub release and upload the zip.
 permissions:
   contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: macos-15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+
       - name: Swift version
         run: swift --version
-      - name: Build app bundle
-        run: BUILD_NUMBER=${{ github.run_number }} sh scripts/build.sh --zip
-      - name: Generated pf rules parse
+
+      - name: Build universal app (Apple Silicon + Intel)
+        run: UNIVERSAL=1 BUILD_NUMBER=${{ github.run_number }} sh scripts/build.sh --zip
+
+      - name: Check generated pf rules parse
         run: |
-          printf 'table <t> persist { 192.0.2.0/24 2001:db8::/32 }\nblock drop out quick on lo0 to <t>\n' > /tmp/t.pf
+          printf 'table <t> persist { 192.0.2.0/24 2001:db8::/32 }\nblock return out quick to <t>\n' > /tmp/t.pf
           pfctl -nf /tmp/t.pf
+
       - uses: actions/upload-artifact@v4
         with:
           name: BlueIPRouter
           path: build/BlueIPRouter-*.zip
-      - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/BlueIPRouter-*.zip
+
+      - name: Publish release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' Sources/BlueIPRouterCore/Models.swift)
+          TAG="v$VERSION"
+          ZIP="build/BlueIPRouter-$VERSION.zip"
+          SHORT=$(git rev-parse --short HEAD)
+          NOTES="Built from $SHORT on $(date -u '+%Y-%m-%d %H:%M UTC').
+
+          Download BlueIPRouter-$VERSION.zip, unzip it and move BlueIPRouter.app to Applications.
+          The app is not notarized: on first launch open System Settings › Privacy & Security and click Open Anyway."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ZIP" --clobber
+            gh release edit "$TAG" --notes "$NOTES"
+          else
+            gh release create "$TAG" "$ZIP" --target "$GITHUB_SHA" --title "BlueIPRouter $VERSION" --notes "$NOTES" --latest
+          fi

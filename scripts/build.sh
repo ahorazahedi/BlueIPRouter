@@ -3,6 +3,7 @@
 #   sh scripts/build.sh            build only
 #   sh scripts/build.sh --install  build and copy to ~/Applications
 #   sh scripts/build.sh --zip      build and package build/BlueIPRouter-<version>.zip
+#   UNIVERSAL=1 sh scripts/build.sh  Apple Silicon + Intel binary
 set -e
 cd "$(dirname "$0")/.."
 ROOT=$(pwd)
@@ -15,9 +16,25 @@ BUILD_NUMBER="${BUILD_NUMBER:-1}"
 # GitHub repository the app checks for updates (owner/name)
 REPOSITORY="${REPOSITORY:-ahorazahedi/BlueIPRouter}"
 
-echo "==> Compiling (release)"
-swift build -c release
-BIN=$(swift build -c release --show-bin-path)
+if [ "${UNIVERSAL:-0}" = "1" ]; then
+  # Apple Silicon + Intel in one app. Builds each architecture separately (works without full Xcode)
+  # and merges them with lipo.
+  echo "==> Compiling (release, arm64 + x86_64)"
+  swift build -c release --triple arm64-apple-macosx14.0
+  swift build -c release --triple x86_64-apple-macosx14.0
+  ARM=$(swift build -c release --triple arm64-apple-macosx14.0 --show-bin-path)
+  X86=$(swift build -c release --triple x86_64-apple-macosx14.0 --show-bin-path)
+  BIN="$ROOT/build/universal"
+  rm -rf "$BIN" && mkdir -p "$BIN"
+  for exe in BlueIPRouter blueiprouter-helper; do
+    lipo -create "$ARM/$exe" "$X86/$exe" -output "$BIN/$exe"
+  done
+  lipo -info "$BIN/BlueIPRouter"
+else
+  echo "==> Compiling (release)"
+  swift build -c release
+  BIN=$(swift build -c release --show-bin-path)
+fi
 
 ICNS="$ROOT/build/AppIcon.icns"
 if [ ! -f "$ICNS" ]; then

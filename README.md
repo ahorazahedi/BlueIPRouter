@@ -55,7 +55,7 @@ sh scripts/build.sh --zip                         # also creates build/BlueIPRou
 BUNDLE_ID=com.example.blueiprouter sh scripts/build.sh   # use your own bundle identifier
 ```
 
-Pushing a tag such as `v1.0.1` makes GitHub Actions build the zip and attach it to a release.
+Every push to `main` makes GitHub Actions build a universal app (Apple Silicon + Intel) and publish it on the release named after the version in `Sources/BlueIPRouterCore/Models.swift`. If you bump that version, a new release is created. Otherwise the zip on the current release is replaced with the newest build.
 
 ## How it works
 
