@@ -15,6 +15,14 @@ struct IPIdentity: Hashable, Sendable {
     var timezone: String?
     var coords: String?
 
+    /// Flag emoji built from the two-letter ISO country code (e.g. "GB" → 🇬🇧). Nil if the code is unknown.
+    var flag: String? {
+        guard let code = country?.uppercased(), code.count == 2,
+              code.unicodeScalars.allSatisfy({ ("A"..."Z").contains($0) }) else { return nil }
+        let scalars = code.unicodeScalars.compactMap { UnicodeScalar(127_397 + $0.value) }
+        return String(String.UnicodeScalarView(scalars))
+    }
+
     var location: String {
         [city, region, country].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
     }

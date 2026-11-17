@@ -44,7 +44,8 @@ struct DashboardView: View {
         return StatTile(title: "Public IPv4", value: d?.v4?.ip ?? (model.publicIPLoading ? "Checking…" : "—"),
                         detail: d?.v4.map { [$0.location, $0.org].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ") }
                             ?? d?.v4Error ?? "Default path",
-                        symbol: "globe", tint: .teal)
+                        symbol: "globe", tint: .teal,
+                        badge: d?.v4?.flag, badgeHelp: d?.v4?.country)
     }
 
     private var egressTile: some View {
@@ -91,6 +92,7 @@ struct DashboardView: View {
                     }
                     Spacer()
                     if let ms = r.latencyMs { Text(String(format: "%.0f ms", ms)).font(.caption).foregroundStyle(.secondary) }
+                    if let flag = r.primary?.flag { Text(flag).help(r.primary?.country ?? "") }
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(r.v4?.ip ?? (r.error == nil ? "no IPv4" : "—")).font(.body.monospaced()).textSelection(.enabled)
                         if let v6 = r.v6?.ip { Text(v6).font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled) }
@@ -188,6 +190,7 @@ struct PublicIdentityCard: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(label).font(.caption.weight(.semibold)).foregroundStyle(.secondary).frame(width: 40, alignment: .leading)
                 if let id {
+                    if let flag = id.flag { Text(flag).font(.title2).help(id.country ?? "") }
                     Text(id.ip).font(.title3.monospaced().weight(.semibold)).textSelection(.enabled).lineLimit(1).minimumScaleFactor(0.6)
                     Button {
                         NSPasteboard.general.clearContents()

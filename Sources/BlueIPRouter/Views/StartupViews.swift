@@ -136,7 +136,7 @@ struct MenuBarView: View {
                      color: model.backgroundServiceRunning ? .green : .secondary)
             }
             Divider()
-            row("globe", "Public IPv4", pub?.v4?.ip ?? "—", pub?.v4.map { [$0.location, $0.org ?? ""].filter { !$0.isEmpty }.joined(separator: " · ") })
+            row("globe", "Public IPv4", (pub?.v4?.flag.map { $0 + " " } ?? "") + (pub?.v4?.ip ?? "—"), pub?.v4.map { [$0.location, $0.org ?? ""].filter { !$0.isEmpty }.joined(separator: " · ") })
             row("arrow.up.right", "Internet via", egress.map { "\(model.displayName($0)) (\($0))" } ?? "—", nil)
             if let lan = model.localInterface {
                 row("laptopcomputer", "Local IP", lan.ipv4 ?? "—", "\(model.displayName(lan.name)) · router \(lan.router ?? "—")")

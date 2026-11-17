@@ -57,6 +57,9 @@ struct StatTile: View {
     var detail: String
     var symbol: String
     var tint: Color
+    /// Optional emoji shown at the top right (e.g. a country flag).
+    var badge: String? = nil
+    var badgeHelp: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -67,6 +70,9 @@ struct StatTile: View {
                     .frame(width: 32, height: 32)
                     .background(RoundedRectangle(cornerRadius: 8).fill(tint.opacity(0.12)))
                 Spacer()
+                if let badge {
+                    Text(badge).font(.system(size: 30)).help(badgeHelp ?? "")
+                }
             }
             Text(title).font(.caption).foregroundStyle(.secondary).textCase(.uppercase)
             Text(value).font(.system(.title2, design: .rounded).weight(.semibold)).monospacedDigit()
