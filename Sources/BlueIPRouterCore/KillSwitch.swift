@@ -131,6 +131,22 @@ public enum CIDR {
     }
 }
 
+/// State of the block list as loaded into pf.
+public struct BlockListStatus: Codable, Hashable, Sendable {
+    public var active: Bool
+    public var denied: [String]
+    public var errors: [String]
+
+    public init(active: Bool, denied: [String], errors: [String]) {
+        self.active = active
+        self.denied = denied
+        self.errors = errors
+    }
+
+    /// Whether traffic to `ip` is refused by the block list.
+    public func blocks(_ ip: String) -> Bool { active && denied.contains { CIDR.contains($0, ip: ip) } }
+}
+
 public struct KillSwitchStatus: Codable, Hashable, Sendable {
     public var active: Bool
     public var mode: KillSwitchConfig.Mode
@@ -167,16 +183,25 @@ public struct KillSwitchStatus: Codable, Hashable, Sendable {
 
 /// Turns a kill-switch configuration (already resolved to CIDRs) into a pf anchor ruleset.
 public enum KillSwitchCompiler {
+    /// - Parameters:
+    ///   - killSwitch: include the kill-switch section (guarded interfaces only).
+    ///   - denied: block-list CIDRs, blocked on every interface (tunnel included).
     public static func compile(mode: KillSwitchConfig.Mode, interfaces: [String], blocked: [String], allowed: [String],
-                               dnsServers: [String], allowDHCP: Bool) -> String {
-        let ifs = interfaces.filter(Validation.isInterfaceName)
-        guard !ifs.isEmpty else { return "# no interfaces to guard\n" }
-        let on = ifs.count == 1 ? ifs[0] : "{ \(ifs.joined(separator: " ")) }"
+                               dnsServers: [String], allowDHCP: Bool, killSwitch: Bool = true, denied: [String] = []) -> String {
         func table(_ name: String, _ items: [String]) -> String {
             let clean = Array(Set(items.compactMap(CIDR.normalize))).sorted()
             return "table <\(name)> persist { \(clean.joined(separator: " ")) }"
         }
-        var lines = ["# BlueIPRouter kill switch — generated \(ISO8601DateFormatter().string(from: Date())). Do not edit."]
+        var lines = ["# BlueIPRouter firewall — generated \(ISO8601DateFormatter().string(from: Date())). Do not edit."]
+        if !denied.isEmpty {
+            // Block list: refuse outgoing connections (apps fail fast) and drop anything coming back.
+            lines.append(table("bir_deny", denied))
+            lines.append("block return out quick to <bir_deny>")
+            lines.append("block drop in quick from <bir_deny>")
+        }
+        let ifs = interfaces.filter(Validation.isInterfaceName)
+        guard killSwitch, !ifs.isEmpty else { return lines.joined(separator: "\n") + "\n" }
+        let on = ifs.count == 1 ? ifs[0] : "{ \(ifs.joined(separator: " ")) }"
         switch mode {
         case .destinations:
             lines.append(table("bir_block", blocked))

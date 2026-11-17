@@ -155,7 +155,11 @@ enum PathAnalyzer {
         } }), owner == nil {
             lines.append("Rule “\(rule.name)” covers this IP but its route is not active. Apply your changes or check the rule's status.")
         }
-        if let ks = snapshot.helperStatus?.killSwitch, ks.active {
+        if let bl = snapshot.helperStatus?.blockList, bl.blocks(ip) {
+            verdict = .blocked
+            headline = "Blocked by your block list"
+            lines.insert("Connections to this address are refused on every interface, the VPN tunnel included.", at: 0)
+        } else if let ks = snapshot.helperStatus?.killSwitch, ks.active {
             if ks.blocks(ip: ip, interface: ifname) {
                 verdict = .blocked
                 headline = "Blocked by the kill switch on \(label) (\(ifname))"

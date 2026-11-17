@@ -87,6 +87,9 @@ struct ConnectionsView: View {
                     if IPv4.isValid(c.remoteIP) {
                         Button("Create Rule for \(c.remoteIP)…") { model.selection = .rules; model.newRule(destination: c.remoteIP) }
                     }
+                    Button("Block \(c.remoteIP)…", role: .destructive) {
+                        Task { await model.blockAndApply(c.remoteIP, note: "Blocked from Connections (\(c.process))") }
+                    }
                     Button("Copy Address") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(c.remoteIP, forType: .string)

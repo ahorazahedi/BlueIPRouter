@@ -174,15 +174,34 @@ public struct DomainResolver: Codable, Hashable, Sendable, Identifiable {
     }
 }
 
+/// An address, network or domain that is blocked completely (every interface, VPN included).
+public struct BlockEntry: Codable, Hashable, Sendable, Identifiable {
+    public var id: UUID
+    public var value: String
+    public var note: String
+    public var enabled: Bool
+
+    public init(id: UUID = UUID(), value: String, note: String = "", enabled: Bool = true) {
+        self.id = id
+        self.value = value
+        self.note = note
+        self.enabled = enabled
+    }
+
+    public var isValid: Bool { KSEntry.parse(value) != nil }
+}
+
 public struct AutomationConfig: Codable, Hashable, Sendable {
     public var profiles: [RoutingProfile]
     public var manualProfileID: UUID?
     public var autoSwitchByNetwork: Bool
     public var triggers: [TriggerRule]
     public var resolvers: [DomainResolver]
+    public var blocked: [BlockEntry]
 
     public init(profiles: [RoutingProfile] = [], manualProfileID: UUID? = nil, autoSwitchByNetwork: Bool = true,
-                triggers: [TriggerRule] = [], resolvers: [DomainResolver] = []) {
+                triggers: [TriggerRule] = [], resolvers: [DomainResolver] = [], blocked: [BlockEntry] = []) {
+        self.blocked = blocked
         self.profiles = profiles
         self.manualProfileID = manualProfileID
         self.autoSwitchByNetwork = autoSwitchByNetwork
@@ -197,9 +216,10 @@ public struct AutomationConfig: Codable, Hashable, Sendable {
         autoSwitchByNetwork = (try? c.decodeIfPresent(Bool.self, forKey: .autoSwitchByNetwork)) ?? true
         triggers = (try? c.decodeIfPresent([TriggerRule].self, forKey: .triggers)) ?? []
         resolvers = (try? c.decodeIfPresent([DomainResolver].self, forKey: .resolvers)) ?? []
+        blocked = (try? c.decodeIfPresent([BlockEntry].self, forKey: .blocked)) ?? []
     }
 
-    public var isEmpty: Bool { profiles.isEmpty && triggers.isEmpty && resolvers.isEmpty && manualProfileID == nil }
+    public var isEmpty: Bool { profiles.isEmpty && triggers.isEmpty && resolvers.isEmpty && blocked.isEmpty && manualProfileID == nil }
 
     /// Which profile is in force, and why: a trigger override, then the current network, then the manual choice.
     public func effectiveProfile(override: UUID?, network: NetworkFingerprint?) -> (profile: RoutingProfile?, reason: String) {

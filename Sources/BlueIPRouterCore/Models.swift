@@ -2,7 +2,7 @@ import Foundation
 
 /// Fixed identifiers and file locations shared by the app and the root helper.
 public enum BIR {
-    public static let version = "1.3.0"
+    public static let version = "1.4.0"
 
     public static let helperLabel = "com.blueiprouter.helper"
     public static let helperBinary = "/Library/PrivilegedHelperTools/com.blueiprouter.helper"
@@ -232,6 +232,7 @@ public struct HelperStatus: Codable, Sendable {
     public var killSwitch: KillSwitchStatus?
     public var profile: ActiveProfileInfo?
     public var resolvers: ResolverStatus?
+    public var blockList: BlockListStatus?
     public var tunnelUp: Bool?
 
     public init(updatedAt: Date, trigger: String, rules: [RuleStatus], installedRoutes: [ManagedRoute], killSwitch: KillSwitchStatus? = nil) {

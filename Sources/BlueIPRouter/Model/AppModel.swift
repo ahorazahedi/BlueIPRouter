@@ -5,7 +5,7 @@ import Observation
 import UniformTypeIdentifiers
 
 enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
-    case dashboard, connections, traffic, rules, profiles, killSwitch, routes, pathCheck, dns, adapters, automation, service, backup, activity, about
+    case dashboard, connections, traffic, rules, profiles, killSwitch, blockList, routes, pathCheck, dns, adapters, automation, service, backup, activity, about
 
     var id: String { rawValue }
     var title: String {
@@ -14,6 +14,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .connections: return "Connections"
         case .traffic: return "Traffic"
         case .profiles: return "Profiles"
+        case .blockList: return "Block List"
         case .dns: return "DNS"
         case .automation: return "Automation"
         case .rules: return "Routing Rules"
@@ -33,6 +34,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .connections: return "point.3.filled.connected.trianglepath.dotted"
         case .traffic: return "chart.xyaxis.line"
         case .profiles: return "square.stack.3d.up"
+        case .blockList: return "nosign"
         case .dns: return "server.rack"
         case .automation: return "bolt.badge.automatic"
         case .rules: return "arrow.triangle.branch"
@@ -291,6 +293,23 @@ final class AppModel {
         } catch {
             if manual { showError("Could not check for updates", error.localizedDescription) }
         }
+    }
+
+    /// Adds an address, network or domain to the block list (applied with the next Apply).
+    func block(_ value: String, note: String = "") {
+        let v = value.trimmingCharacters(in: .whitespaces).lowercased()
+        guard KSEntry.parse(v) != nil else { return }
+        if let i = workspace.automation.blocked.firstIndex(where: { $0.value == v }) {
+            workspace.automation.blocked[i].enabled = true
+        } else {
+            workspace.automation.blocked.append(BlockEntry(value: v, note: note))
+        }
+        log("Added \(v) to the block list", ok: true, "Press Apply to enforce it.")
+    }
+
+    func blockAndApply(_ value: String, note: String = "") async {
+        block(value, note: note)
+        await apply(title: "block \(value)")
     }
 
     func describe(_ action: TriggerAction) -> String {

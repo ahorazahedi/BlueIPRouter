@@ -76,6 +76,11 @@ struct PathCheckView: View {
                     HStack {
                         Text(hop.ip).font(.title3.monospaced().weight(.semibold)).textSelection(.enabled)
                         Spacer()
+                        Button("Block", role: .destructive) {
+                            let target = model.pathResult?.isDomain == true ? model.pathResult!.query : hop.ip
+                            Task { await model.blockAndApply(target, note: "Blocked from Path Check") }
+                        }
+                        .help("Add to the block list and apply")
                         if let ruleID = hop.ruleID, let rule = model.workspace.rules.first(where: { $0.id == ruleID }) {
                             Button("Edit Rule “\(rule.name)”") { model.editingRule = rule }
                         } else {

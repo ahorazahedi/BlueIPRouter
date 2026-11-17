@@ -126,46 +126,62 @@ func resolveEntries(_ entries: [String], cache: inout [String: [String]]) -> (ci
     return (cidrs, errors)
 }
 
-func applyKillSwitch(routes: [ManagedRoute], interfaces: [InterfaceSnapshot], cache: inout [String: [String]],
-                     enabledOverride: Bool?) -> KillSwitchStatus? {
+/// Loads the pf anchor: the block list (all interfaces) plus the kill switch (guarded interfaces).
+func applyFirewall(routes: [ManagedRoute], interfaces: [InterfaceSnapshot], cache: inout [String: [String]],
+                   enabledOverride: Bool?, blockEntries: [BlockEntry]) -> (killSwitch: KillSwitchStatus?, blockList: BlockListStatus?) {
     let loaded = BIRJSON.load(KillSwitchConfig.self, from: BIR.killSwitchConfig)
-    guard let cfg = loaded, enabledOverride ?? cfg.enabled else {
-        if FileManager.default.fileExists(atPath: BIR.pfRules) { killSwitchOff(reason: "disabled") }
-        return nil
+    let ksEnabled = loaded.map { enabledOverride ?? $0.enabled } ?? (enabledOverride ?? false)
+    let cfg = loaded ?? KillSwitchConfig()
+
+    var denyErrors: [String] = []
+    var denied: [String] = []
+    let denyValues = blockEntries.filter(\.enabled).map(\.value)
+    if !denyValues.isEmpty {
+        let r = resolveEntries(denyValues, cache: &cache)
+        denied = Array(Set(r.cidrs)).sorted()
+        denyErrors = r.errors
     }
+
+    guard ksEnabled || !denied.isEmpty else {
+        if FileManager.default.fileExists(atPath: BIR.pfRules) { killSwitchOff(reason: "nothing to enforce") }
+        return (nil, denyValues.isEmpty ? nil : BlockListStatus(active: false, denied: [], errors: denyErrors))
+    }
+
     let ifs = cfg.interfaces.filter(Validation.isInterfaceName)
     var errors: [String] = []
     var blocked: [String] = []
     var allowed: [String] = []
     var dns: [String] = []
-    let learned = cfg.learnVPNServers ? learnVPNServers() : []
-
-    switch cfg.mode {
-    case .destinations:
-        for list in cfg.blockLists where list.enabled {
-            let r = resolveEntries(list.entries, cache: &cache)
-            blocked += r.cidrs
+    var learned: [String] = []
+    if ksEnabled {
+        learned = cfg.learnVPNServers ? learnVPNServers() : []
+        switch cfg.mode {
+        case .destinations:
+            for list in cfg.blockLists where list.enabled {
+                let r = resolveEntries(list.entries, cache: &cache)
+                blocked += r.cidrs
+                errors += r.errors
+            }
+        case .fullSystem:
+            let r = resolveEntries(cfg.allow, cache: &cache)
+            allowed += r.cidrs
             errors += r.errors
+            allowed += learned.compactMap(CIDR.normalize)
+            if cfg.allowLocalNetworks {
+                allowed += NetworkFacts.attachedNetworks(interfaces, names: ifs) + KillSwitchCompiler.linkLocalRanges
+            }
+            if cfg.allowRuleDestinations { allowed += routes.map(\.key) }
+            if cfg.allowDNS { dns = NetworkFacts.dnsServers() }
+            if learned.isEmpty && cfg.allow.isEmpty {
+                errors.append("No VPN server is allowed yet: connect your VPN once and press “Detect VPN servers”, or the VPN cannot reconnect.")
+            }
         }
-    case .fullSystem:
-        let r = resolveEntries(cfg.allow, cache: &cache)
-        allowed += r.cidrs
-        errors += r.errors
-        allowed += learned.compactMap(CIDR.normalize)
-        if cfg.allowLocalNetworks {
-            allowed += NetworkFacts.attachedNetworks(interfaces, names: ifs) + KillSwitchCompiler.linkLocalRanges
-        }
-        if cfg.allowRuleDestinations { allowed += routes.map(\.key) }
-        if cfg.allowDNS { dns = NetworkFacts.dnsServers() }
-        if learned.isEmpty && cfg.allow.isEmpty {
-            errors.append("No VPN server is allowed yet: connect your VPN once and press “Detect VPN servers”, or the VPN cannot reconnect.")
-        }
+        blocked = Array(Set(blocked)).sorted()
+        allowed = Array(Set(allowed)).sorted()
     }
-    blocked = Array(Set(blocked)).sorted()
-    allowed = Array(Set(allowed)).sorted()
 
     let text = KillSwitchCompiler.compile(mode: cfg.mode, interfaces: ifs, blocked: blocked, allowed: allowed,
-                                          dnsServers: dns, allowDHCP: cfg.allowDHCP)
+                                          dnsServers: dns, allowDHCP: cfg.allowDHCP, killSwitch: ksEnabled, denied: denied)
     let previous = try? String(contentsOfFile: BIR.pfRules, encoding: .utf8)
     let changed = previous.map { $0.split(separator: "\n").dropFirst() != text.split(separator: "\n").dropFirst() } ?? true
     var pfOK = true
@@ -178,15 +194,21 @@ func applyKillSwitch(routes: [ManagedRoute], interfaces: [InterfaceSnapshot], ca
         if !load.ok {
             pfOK = false
             errors.append("pfctl rejected the rules: \(load.combined)")
-            log("kill switch load failed: \(load.combined)")
+            log("firewall load failed: \(load.combined)")
         } else if changed {
-            log("kill switch loaded (\(cfg.mode.rawValue)) on \(ifs.joined(separator: ", ")): \(cfg.mode == .destinations ? "\(blocked.count) blocked" : "\(allowed.count) allowed") ranges")
+            var parts: [String] = []
+            if !denied.isEmpty { parts.append("block list \(denied.count) ranges") }
+            if ksEnabled { parts.append("kill switch \(cfg.mode.rawValue) on \(ifs.joined(separator: ", "))") }
+            log("firewall loaded: \(parts.joined(separator: "; "))")
         }
     }
     let enabled = pfOK && ensurePFEnabled()
     if !enabled { errors.append("pf could not be enabled") }
-    return KillSwitchStatus(active: pfOK, mode: cfg.mode, interfaces: ifs, blocked: blocked, allowed: allowed,
-                            dnsServers: dns, learnedServers: learned, pfEnabled: enabled, errors: errors)
+    let ks = ksEnabled ? KillSwitchStatus(active: pfOK, mode: cfg.mode, interfaces: ifs, blocked: blocked, allowed: allowed,
+                                          dnsServers: dns, learnedServers: learned, pfEnabled: enabled, errors: errors) : nil
+    let bl = denyValues.isEmpty ? nil : BlockListStatus(active: pfOK && enabled && !denied.isEmpty, denied: denied,
+                                                        errors: denyErrors + (pfOK ? [] : errors))
+    return (ks, bl)
 }
 
 // MARK: - Per-domain DNS (/etc/resolver)
@@ -390,7 +412,9 @@ func apply(trigger: String) {
 
     // 3. Kill switch (pf): trigger override > profile > its own setting.
     let ksOverride = runtime.killSwitchOverride ?? profile?.killSwitch
-    let ks = applyKillSwitch(routes: plan.routes, interfaces: interfaces, cache: &cache, enabledOverride: ksOverride)
+    let firewall = applyFirewall(routes: plan.routes, interfaces: interfaces, cache: &cache, enabledOverride: ksOverride,
+                                 blockEntries: automation.blocked)
+    let ks = firewall.killSwitch
     let armed = ks?.active == true
     if let was = runtime.killSwitchArmed, was != armed {
         events.append(BIREvent(kind: armed ? "killSwitchArmed" : "killSwitchDisarmed", title: armed ? "Kill switch armed" : "Kill switch off"))
@@ -403,6 +427,7 @@ func apply(trigger: String) {
     var status = HelperStatus(updatedAt: Date(), trigger: trigger, rules: ordered, installedRoutes: installed, killSwitch: ks)
     status.profile = ActiveProfileInfo(id: profile?.id, name: profile?.name, reason: chosen.reason)
     status.resolvers = resolvers
+    status.blockList = firewall.blockList
     status.tunnelUp = runtime.tunnelUp
     for st in ordered where st.state == .failed || st.state == .partial {
         if !(previousStatus?.rules.contains { $0.ruleID == st.ruleID && $0.state == st.state } ?? false) {

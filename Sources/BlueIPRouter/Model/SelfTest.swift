@@ -38,6 +38,17 @@ enum SelfTest {
             print("pf \(mode.rawValue) on \(guarded): \(r.ok ? "syntax ok" : "FAILED \(r.stderr)")")
         }
 
+        for (label, ks) in [("block list only", false), ("block list + kill switch", true)] {
+            let text = KillSwitchCompiler.compile(mode: .destinations, interfaces: guarded, blocked: BlockList.telegram.entries, allowed: [],
+                                                  dnsServers: [], allowDHCP: true, killSwitch: ks, denied: ["203.0.113.10/32", "2001:db8::/32"])
+            let path = NSTemporaryDirectory() + "bir-deny.pf"
+            try? text.write(toFile: path, atomically: true, encoding: .utf8)
+            let r = Shell.run("/sbin/pfctl", ["-nf", path])
+            print("pf \(label): \(r.ok ? "syntax ok" : "FAILED \(r.stderr)")")
+            if !ks { print(text) }
+        }
+        let bl = BlockListStatus(active: true, denied: ["203.0.113.0/24"], errors: [])
+        print("blocklist matches 203.0.113.10: \(bl.blocks("203.0.113.10")) 8.8.8.8: \(bl.blocks("8.8.8.8"))")
         let conns = ConnectionScanner.scan(interfaces: snap.interfaces.map(\.snapshot))
         let byIf = Dictionary(grouping: conns, by: { $0.interface ?? "?" }).mapValues(\.count)
         print("connections: \(conns.count) by interface \(byIf)")
