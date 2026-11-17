@@ -422,7 +422,8 @@ func apply(trigger: String) {
     }
     recordEvents(events)
     if trigger != "daemon" && trigger != "timer" {
-        log("apply (\(trigger)): \(installed.count)/\(plan.routes.count) routes in place; profile \(profile?.name ?? "none"); kill switch \(armed ? "on" : "off")")
+        let waiting = installed.count - installed.filter { desiredKeys.contains($0.key) }.count
+        log("apply (\(trigger)): \(installed.count - waiting)/\(plan.routes.count) routes in place\(waiting > 0 ? ", \(waiting) waiting for their interface" : ""); profile \(profile?.name ?? "none"); kill switch \(armed ? "on" : "off")")
     }
     print("ok: \(installed.count)/\(plan.routes.count) routes; profile \(profile?.name ?? "none"); kill switch \(armed ? "on" : "off")")
 }
