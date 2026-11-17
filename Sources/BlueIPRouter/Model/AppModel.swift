@@ -370,6 +370,12 @@ final class AppModel {
             ]
             cmds += extraCommands
             cmds.append("\(shq(BIR.helperBinary)) apply --trigger app")
+            // Persistent rules and the kill switch only survive reboots with the background service,
+            // so the first Apply that needs it installs it in the same (single) admin prompt.
+            let needsService = workspace.rules.contains { $0.enabled && $0.persistent } || workspace.killSwitch.enabled
+            if needsService && !net.service.daemonInstalled {
+                cmds += try Privileged.installDaemonCommands(interval: workspace.settings.serviceIntervalSeconds)
+            }
             if await runPrivileged(title, cmds) {
                 autoBackup("Applied")
                 if let failing = net.helperStatus?.rules.filter({ $0.state == .failed || $0.state == .partial }), !failing.isEmpty {
