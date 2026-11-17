@@ -11,6 +11,19 @@ struct DashboardView: View {
                     Button { model.selection = .pathCheck } label: { Label("Check a Path", systemImage: "magnifyingglass") }
                 }
 
+                if let u = model.availableUpdate {
+                    Banner(symbol: "arrow.down.circle", tint: .blue, title: "BlueIPRouter \(u.version) is available",
+                           message: "You have \(BIR.version). Download the new version and replace the app in Applications.",
+                           actions: AnyView(HStack {
+                               Button("Release Notes") { NSWorkspace.shared.open(u.pageURL) }
+                               Button("Download") { NSWorkspace.shared.open(u.downloadURL ?? u.pageURL) }.buttonStyle(.borderedProminent)
+                           }))
+                }
+                if model.daemonOutdated {
+                    Banner(symbol: "arrow.triangle.2.circlepath", tint: .orange, title: "Background service needs an update",
+                           message: "This version reacts to VPN and network changes instantly and runs triggers. Update it once (administrator password).",
+                           actions: AnyView(Button("Update Service") { Task { await model.apply(title: "update the background service") } }.buttonStyle(.borderedProminent)))
+                }
                 PendingBanner()
 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {

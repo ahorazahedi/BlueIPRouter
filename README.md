@@ -15,7 +15,14 @@ Built with SwiftUI. Requires macOS 14 or later.
 | **Path Check** | Enter an IP or domain to see the DNS answers, the route the kernel uses, the interface and gateway, why that route matched, whether the kill switch blocks it, a TCP test and a live traceroute |
 | **Network Adapters** | Addresses, MAC, router, DNS, traffic counters and aliases per interface. Turn an interface up or down, Wi-Fi power, renew DHCP, set the MTU, set DNS servers, flush the DNS cache |
 | **Persistence** | A background service that re-applies everything at boot and on a schedule: it re-resolves domains, follows router changes and repairs missing routes. Startup switches for the service, Open at Login and the menu bar icon |
-| **Menu bar** | Public IP, egress interface, managed routes, kill switch state and Apply, without opening the window. The app keeps running there when its window is closed |
+| **Menu bar** | Public IPv4/IPv6 with flag, location and ISP, live download/upload speed, egress interface, profile, kill switch and Apply, without opening the window. The bar can show an icon, the country flag, flag + IP, or live speed. The app keeps running there when its window is closed |
+| **Connections** | Live list of which app talks to which address and through which interface, with a filter for traffic leaving outside the VPN tunnel |
+| **Traffic** | Per-interface throughput charts (15 min to 7 days) and totals: how much goes through the VPN tunnel, Wi-Fi and other links |
+| **Profiles** | Named sets of active rules (e.g. Home, Office, Travel), chosen by hand or automatically by the network you join (recognised by the router, no location permission needed), with an optional kill-switch setting per profile |
+| **Automation** | Triggers that run in the background service when a full-tunnel VPN connects or drops, an interface goes up or down, internet traffic switches interface or you join another network: switch profile, force the kill switch, re-learn VPN servers, notify. Includes an event history |
+| **DNS** | DNS leak test, the resolvers macOS uses and whether they are reached outside the VPN tunnel, and per-domain resolvers (`/etc/resolver`) |
+| **Notifications** | Public IP/country changes, VPN drops and reconnects, kill switch changes, failing rules, network changes and new versions |
+| **Updates** | Checks GitHub Releases once a day (or on demand) and offers the download |
 | **Setup Assistant** | A first-run checklist: install the background service, open at login, menu bar icon, import existing static routes, create the first rule |
 | **Backup & Restore** | Export and import JSON, automatic snapshots (after every Apply and before every restore or reset), and reset to default |
 

@@ -92,6 +92,12 @@ struct NetworkSnapshot: Sendable {
     var liveRoutes: [UUID: LiveCount] = [:]
     var service = ServiceStatus()
     var appliedKillSwitch: KillSwitchConfig?
+    var appliedAutomation: AutomationConfig?
+    var runtime: RuntimeState?
+    var events: [BIREvent] = []
+    var network: NetworkFingerprint?
+    var resolverFiles: [ResolverFiles.Entry] = []
+    var installedDaemonPlist: String?
     var learnedServers: [String] = []
     var pfEnabled = false
     var takenAt = Date()
@@ -99,7 +105,7 @@ struct NetworkSnapshot: Sendable {
 
 /// Reads everything the app shows. Runs off the main thread and needs no privileges.
 enum NetworkScanner {
-    static let catchAllDestinations: Set<String> = ["0/1", "128.0/1", "1", "2/7", "4/6", "8/5", "16/4", "32/3", "64/2"]
+    static let catchAllDestinations = NetworkFacts.catchAllDestinations
 
     static func scan(rules: [RouteRule] = []) -> NetworkSnapshot {
         var snap = NetworkSnapshot()
@@ -136,6 +142,12 @@ enum NetworkScanner {
         snap.service = serviceStatus()
         snap.liveRoutes = liveCheck(rules, interfaces: raw)
         snap.appliedKillSwitch = BIRJSON.load(KillSwitchConfig.self, from: BIR.killSwitchConfig)
+        snap.appliedAutomation = BIRJSON.load(AutomationConfig.self, from: BIR.automationConfig)
+        snap.runtime = BIRJSON.load(RuntimeState.self, from: BIR.runtimeState)
+        snap.events = BIRJSON.load([BIREvent].self, from: BIR.events) ?? []
+        snap.network = NetworkFingerprint.current(interfaces: raw)
+        snap.resolverFiles = ResolverFiles.list()
+        snap.installedDaemonPlist = try? String(contentsOfFile: BIR.daemonPlist, encoding: .utf8)
         snap.learnedServers = BIRJSON.load([String].self, from: BIR.learnedServers) ?? []
         snap.pfEnabled = snap.helperStatus?.killSwitch?.pfEnabled ?? false
         snap.takenAt = Date()

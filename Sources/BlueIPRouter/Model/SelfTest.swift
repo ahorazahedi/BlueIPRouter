@@ -38,6 +38,13 @@ enum SelfTest {
             print("pf \(mode.rawValue) on \(guarded): \(r.ok ? "syntax ok" : "FAILED \(r.stderr)")")
         }
 
+        let conns = ConnectionScanner.scan(interfaces: snap.interfaces.map(\.snapshot))
+        let byIf = Dictionary(grouping: conns, by: { $0.interface ?? "?" }).mapValues(\.count)
+        print("connections: \(conns.count) by interface \(byIf)")
+        print("full tunnels: \(NetworkFacts.fullTunnelInterfaces(routes: snap.routesV4)) network: \(snap.network?.label ?? "-")")
+        for r in DNSInspector.resolvers().prefix(3) { print("resolver \(r.domain ?? "default"): \(r.nameservers) via \(r.paths)") }
+        do { let u = try await UpdateChecker.latest(); print("update check: \(u.map { "newer \($0.version)" } ?? "no newer release") (repo \(UpdateChecker.repository))") }
+        catch { print("update check failed: \(error.localizedDescription)") }
         let available = await Probes.availableInterfaces()
         let (def, ips) = await Probes.probePath(id: "default", title: "default", interface: nil)
         for ip in ips {

@@ -8,15 +8,22 @@ struct RootView: View {
         @Bindable var model = model
         NavigationSplitView {
             List(selection: $model.selection) {
-                Section("Overview") { row(.dashboard) }
+                Section("Overview") {
+                    row(.dashboard)
+                    row(.connections)
+                    row(.traffic)
+                }
                 Section("Routing") {
                     row(.rules, badge: model.pendingChanges.count)
+                    row(.profiles)
                     row(.killSwitch, badge: model.killSwitchPending ? 1 : 0)
                     row(.routes)
                     row(.pathCheck)
+                    row(.dns)
                 }
                 Section("System") {
                     row(.adapters)
+                    row(.automation, badge: model.automationPending ? 1 : 0)
                     row(.service)
                     row(.backup)
                     row(.activity)
@@ -30,6 +37,11 @@ struct RootView: View {
             Group {
                 switch model.selection ?? .dashboard {
                 case .dashboard: DashboardView()
+                case .connections: ConnectionsView()
+                case .traffic: TrafficView()
+                case .profiles: ProfilesView()
+                case .dns: DNSView()
+                case .automation: AutomationView()
                 case .rules: RulesView()
                 case .killSwitch: KillSwitchView()
                 case .routes: RoutingTableView()

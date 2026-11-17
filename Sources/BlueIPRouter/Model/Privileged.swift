@@ -56,12 +56,14 @@ enum Privileged {
           <key>ProgramArguments</key>
           <array>
             <string>\(BIR.helperBinary)</string>
-            <string>apply</string>
-            <string>--trigger</string>
             <string>daemon</string>
+            <string>--interval</string>
+            <string>\(max(15, interval))</string>
           </array>
           <key>RunAtLoad</key><true/>
-          <key>StartInterval</key><integer>\(max(15, interval))</integer>
+          <key>KeepAlive</key><true/>
+          <key>ThrottleInterval</key><integer>10</integer>
+          <key>ProcessType</key><string>Background</string>
           <key>StandardOutPath</key><string>/dev/null</string>
           <key>StandardErrorPath</key><string>\(BIR.log)</string>
         </dict>

@@ -17,7 +17,7 @@ struct ServiceView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(s.daemonInstalled && s.loaded ? "On" : "Off").font(.title.weight(.semibold))
                                     .foregroundStyle(s.daemonInstalled && s.loaded ? .green : .secondary)
-                                Text("A root LaunchDaemon re-applies every rule at boot and every \(s.interval ?? model.workspace.settings.serviceIntervalSeconds) s: it re-resolves domains, follows router changes and repairs missing routes.")
+                                Text("A root LaunchDaemon re-applies everything at boot, within seconds of any network change (VPN up/down, new Wi-Fi), and every \(model.workspace.settings.serviceIntervalSeconds) s. It re-resolves domains, follows router changes, runs triggers and repairs missing routes.")
                                     .font(.callout).foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -35,7 +35,7 @@ struct ServiceView: View {
                             Stepper("Check every \(model.workspace.settings.serviceIntervalSeconds) s",
                                     value: $model.workspace.settings.serviceIntervalSeconds, in: 15...3600, step: 15)
                             Spacer()
-                            if s.daemonInstalled && s.interval != nil && s.interval != model.workspace.settings.serviceIntervalSeconds {
+                            if model.daemonOutdated {
                                 Button("Update Service") { Task { await model.setService(enabled: true) } }
                             }
                             Button("Run Now") { Task { await model.runServiceNow() } }

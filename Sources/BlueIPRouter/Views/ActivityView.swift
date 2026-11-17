@@ -65,6 +65,10 @@ struct SettingsView: View {
             } footer: {
                 Text("Addresses come from api.ipify.org (IPv4) and api6.ipify.org (IPv6); location and ISP from the provider above, with the other one as a fallback.")
             }
+            Section("Updates") {
+                Toggle("Check for new versions once a day", isOn: $model.workspace.settings.checkForUpdates)
+                Button("Check Now") { Task { await model.checkForUpdates(manual: true) } }
+            }
             Section("Persistence & backups") {
                 Stepper("Service checks every \(model.workspace.settings.serviceIntervalSeconds) s",
                         value: $model.workspace.settings.serviceIntervalSeconds, in: 15...3600, step: 15)

@@ -6,9 +6,9 @@ enum AppInfo {
     static let author = "Ahora Zahedi"
     static let authorGitHub = URL(string: "https://github.com/ahorazahedi")!
     static let authorWebsite = URL(string: "https://ahora.bluedopmaine.io/")!
-    static let repository = URL(string: "https://github.com/ahorazahedi/BlueIPRouter")!
-    static let issues = URL(string: "https://github.com/ahorazahedi/BlueIPRouter/issues")!
-    static let license = URL(string: "https://github.com/ahorazahedi/BlueIPRouter/blob/main/LICENSE")!
+    static var repository: URL { URL(string: "https://github.com/\(UpdateChecker.repository)")! }
+    static var issues: URL { repository.appendingPathComponent("issues") }
+    static var license: URL { repository.appendingPathComponent("blob/main/LICENSE") }
 
     static var version: String {
         let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? BIR.version
@@ -19,6 +19,7 @@ enum AppInfo {
 
 /// About page: shown in its own window (BlueIPRouter › About) and in the sidebar.
 struct AboutView: View {
+    @Environment(AppModel.self) private var model
     var compact = false
 
     var body: some View {
@@ -46,6 +47,17 @@ struct AboutView: View {
             .frame(maxWidth: 420)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
+
+            HStack(spacing: 10) {
+                Button {
+                    Task { await model.checkForUpdates(manual: true) }
+                } label: {
+                    if model.checkingForUpdates { ProgressView().controlSize(.small) } else { Label("Check for Updates", systemImage: "arrow.down.circle") }
+                }
+                if let u = model.availableUpdate {
+                    Button("Download \(u.version)") { NSWorkspace.shared.open(u.downloadURL ?? u.pageURL) }.buttonStyle(.borderedProminent)
+                }
+            }
 
             HStack(spacing: 16) {
                 Link("Source code", destination: AppInfo.repository)

@@ -155,6 +155,7 @@ struct PendingBanner: View {
         if model.hasPending {
             let changes = model.pendingChanges
             let items = changes.prefix(4).map { "\($0.kind.rawValue): \($0.rule.name)" } + (model.killSwitchPending ? ["Kill switch settings"] : [])
+                + (model.automationPending ? ["Profiles, triggers or DNS"] : [])
             Banner(symbol: "exclamationmark.arrow.triangle.2.circlepath", tint: .orange,
                    title: "\(model.pendingCount) unapplied change\(model.pendingCount == 1 ? "" : "s")",
                    message: items.joined(separator: " · ") + (model.liveButUnmanaged.isEmpty ? "" :

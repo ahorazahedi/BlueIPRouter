@@ -27,7 +27,10 @@ struct BlueIPRouterApp: App {
         }
         .defaultSize(width: 1320, height: 860)
         .commands {
-            CommandGroup(replacing: .appInfo) { AboutMenuButton() }
+            CommandGroup(replacing: .appInfo) {
+                AboutMenuButton()
+                Button("Check for Updates…") { Task { await model.checkForUpdates(manual: true) } }
+            }
             CommandGroup(after: .newItem) {
                 Button("New Routing Rule") { model.selection = .rules; model.newRule() }
                     .keyboardShortcut("n")
@@ -51,7 +54,7 @@ struct BlueIPRouterApp: App {
         }
 
         Window("About BlueIPRouter", id: "about") {
-            AboutView(compact: true).frame(width: 520)
+            AboutView(compact: true).environment(model).frame(width: 520)
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
@@ -59,7 +62,7 @@ struct BlueIPRouterApp: App {
         MenuBarExtra(isInserted: $menuBarEnabled) {
             MenuBarView().environment(model)
         } label: {
-            Image(systemName: model.net.helperStatus?.killSwitch?.active == true ? "arrow.triangle.branch.circle.fill" : "arrow.triangle.branch")
+            MenuBarLabel().environment(model)
         }
         .menuBarExtraStyle(.window)
 

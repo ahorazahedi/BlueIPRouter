@@ -21,6 +21,8 @@ struct AppSettings: Codable, Hashable {
     var autoBackupLimit: Int = 25
     var showSystemInterfaces: Bool = false
     var hideLinkLayerRoutes: Bool = true
+    var notifications = NotificationPrefs()
+    var checkForUpdates = true
 
     init() {}
 
@@ -34,6 +36,8 @@ struct AppSettings: Codable, Hashable {
         autoBackupLimit = (try? c.decodeIfPresent(Int.self, forKey: .autoBackupLimit)) ?? d.autoBackupLimit
         showSystemInterfaces = (try? c.decodeIfPresent(Bool.self, forKey: .showSystemInterfaces)) ?? d.showSystemInterfaces
         hideLinkLayerRoutes = (try? c.decodeIfPresent(Bool.self, forKey: .hideLinkLayerRoutes)) ?? d.hideLinkLayerRoutes
+        notifications = (try? c.decodeIfPresent(NotificationPrefs.self, forKey: .notifications)) ?? d.notifications
+        checkForUpdates = (try? c.decodeIfPresent(Bool.self, forKey: .checkForUpdates)) ?? d.checkForUpdates
     }
 }
 
@@ -44,6 +48,7 @@ struct Workspace: Codable {
     var settings = AppSettings()
     var killSwitch = KillSwitchConfig()
     var setupCompleted = false
+    var automation = AutomationConfig()
 
     init() {}
 
@@ -54,6 +59,7 @@ struct Workspace: Codable {
         settings = (try? c.decodeIfPresent(AppSettings.self, forKey: .settings)) ?? AppSettings()
         killSwitch = (try? c.decodeIfPresent(KillSwitchConfig.self, forKey: .killSwitch)) ?? KillSwitchConfig()
         setupCompleted = (try? c.decodeIfPresent(Bool.self, forKey: .setupCompleted)) ?? false
+        automation = (try? c.decodeIfPresent(AutomationConfig.self, forKey: .automation)) ?? AutomationConfig()
     }
 }
 
@@ -69,6 +75,7 @@ struct BackupBundle: Codable, Identifiable {
     var settings: AppSettings
     var routingSnapshot: [RouteEntry]
     var killSwitch: KillSwitchConfig?
+    var automation: AutomationConfig?
 
     var id: Date { createdAt }
 }

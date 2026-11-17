@@ -1,6 +1,8 @@
 // blueiprouter-helper — runs as root. Applies BlueIPRouter rules to the kernel routing table and pf.
 //
-//   apply [--trigger <name>]   reconcile routes and the kill switch with the rule files (app + LaunchDaemon)
+//   daemon [--interval <s>]    long-running mode for the LaunchDaemon: applies at start, on every network
+//                              change (SystemConfiguration notifications) and every <s> seconds
+//   apply [--trigger <name>]   one reconcile pass: events, triggers, profile, routes, kill switch, DNS
 //   remove-all                 delete every route this helper installed and unload the kill switch
 //   killswitch-off             unload the kill switch only
 //   detect-vpn                 record the servers VPN cores (xray, sing-box…) are connected to
@@ -12,6 +14,7 @@
 import BlueIPRouterCore
 import Darwin
 import Foundation
+import SystemConfiguration
 
 setvbuf(stdout, nil, _IOLBF, 0)
 
@@ -123,8 +126,10 @@ func resolveEntries(_ entries: [String], cache: inout [String: [String]]) -> (ci
     return (cidrs, errors)
 }
 
-func applyKillSwitch(routes: [ManagedRoute], interfaces: [InterfaceSnapshot], cache: inout [String: [String]]) -> KillSwitchStatus? {
-    guard let cfg = BIRJSON.load(KillSwitchConfig.self, from: BIR.killSwitchConfig), cfg.enabled else {
+func applyKillSwitch(routes: [ManagedRoute], interfaces: [InterfaceSnapshot], cache: inout [String: [String]],
+                     enabledOverride: Bool?) -> KillSwitchStatus? {
+    let loaded = BIRJSON.load(KillSwitchConfig.self, from: BIR.killSwitchConfig)
+    guard let cfg = loaded, enabledOverride ?? cfg.enabled else {
         if FileManager.default.fileExists(atPath: BIR.pfRules) { killSwitchOff(reason: "disabled") }
         return nil
     }
@@ -184,13 +189,153 @@ func applyKillSwitch(routes: [ManagedRoute], interfaces: [InterfaceSnapshot], ca
                             dnsServers: dns, learnedServers: learned, pfEnabled: enabled, errors: errors)
 }
 
+// MARK: - Per-domain DNS (/etc/resolver)
+
+func applyResolvers(_ resolvers: [DomainResolver]) -> ResolverStatus {
+    var errors: [String] = []
+    var active: [String] = []
+    var changed = false
+    let fm = FileManager.default
+    if !resolvers.isEmpty { try? fm.createDirectory(atPath: BIR.resolverDir, withIntermediateDirectories: true) }
+    var wanted: [String: String] = [:]
+    for r in resolvers where r.enabled {
+        if let e = r.validationError { errors.append(e); continue }
+        let name = r.domain.lowercased()
+        guard !name.contains("/"), !name.hasPrefix(".") else { continue }
+        wanted[name] = r.fileContent
+    }
+    for (name, content) in wanted {
+        let path = BIR.resolverDir + "/" + name
+        let existing = try? String(contentsOfFile: path, encoding: .utf8)
+        if let existing, !existing.hasPrefix(BIR.resolverMarker) {
+            errors.append("\(path) exists and was not created by BlueIPRouter; left unchanged")
+            continue
+        }
+        if existing != content {
+            do {
+                try content.write(toFile: path, atomically: true, encoding: .utf8)
+                chmod(path, 0o644)
+                changed = true
+                log("resolver \(name) -> \(content.split(separator: "\n").dropFirst().joined(separator: ", "))")
+            } catch { errors.append("Cannot write \(path): \(error.localizedDescription)") }
+        }
+        active.append(name)
+    }
+    for entry in ResolverFiles.list() where entry.managed && wanted[entry.domain] == nil {
+        try? fm.removeItem(atPath: BIR.resolverDir + "/" + entry.domain)
+        changed = true
+        log("resolver \(entry.domain) removed")
+    }
+    if changed { _ = Shell.run("/usr/bin/killall", ["-HUP", "mDNSResponder"], timeout: 5) }
+    return ResolverStatus(active: active.sorted(), errors: errors)
+}
+
+// MARK: - Events and triggers
+
+func recordEvents(_ new: [BIREvent]) {
+    guard !new.isEmpty else { return }
+    var all = BIRJSON.load([BIREvent].self, from: BIR.events) ?? []
+    all.append(contentsOf: new)
+    if all.count > 200 { all.removeFirst(all.count - 200) }
+    try? BIRJSON.save(all, to: BIR.events)
+    for e in new { log("event: \(e.title)\(e.detail.isEmpty ? "" : " — \(e.detail)")") }
+}
+
+/// Compares the network with the last pass, records events and runs matching triggers.
+func detectEvents(config: AutomationConfig, runtime: inout RuntimeState, firstRun: Bool,
+                  interfaces: [InterfaceSnapshot], table: [RouteEntry]) -> [BIREvent] {
+    let tunnels = NetworkFacts.fullTunnelInterfaces(routes: table)
+    let tunnelUp = !tunnels.isEmpty
+    let states = NetworkFacts.watchedInterfaceStates(interfaces)
+    let egress = RouteQuery.lookup("1.1.1.1")?.interface
+    let network = NetworkFingerprint.current(interfaces: interfaces)
+    defer {
+        runtime.tunnelUp = tunnelUp
+        runtime.interfacesUp = states
+        runtime.egress = egress
+        runtime.network = network
+    }
+    guard !firstRun else { return [] }
+
+    var fired: [(TriggerEvent, String)] = []
+    if tunnelUp != runtime.tunnelUp {
+        fired.append((tunnelUp ? .tunnelUp : .tunnelDown, tunnelUp ? "on \(tunnels.joined(separator: ", "))" : ""))
+    }
+    for (name, up) in states where (runtime.interfacesUp[name] ?? false) != up {
+        fired.append((up ? .interfaceUp(name) : .interfaceDown(name), ""))
+    }
+    for (name, wasUp) in runtime.interfacesUp where wasUp && states[name] == nil {
+        fired.append((.interfaceDown(name), ""))
+    }
+    if egress != runtime.egress {
+        fired.append((.egressChanged, "\(runtime.egress ?? "none") → \(egress ?? "none")"))
+    }
+    if network != runtime.network, network?.routerMAC != runtime.network?.routerMAC || network?.routerIP != runtime.network?.routerIP {
+        fired.append((.networkChanged, network?.label ?? "no network"))
+    }
+
+    var events: [BIREvent] = []
+    for (event, detail) in fired {
+        let matching = config.triggers.filter { $0.enabled && $0.event == event }
+        var notes: [String] = []
+        for t in matching {
+            for action in t.actions {
+                switch action {
+                case .activateProfile(let id):
+                    runtime.profileOverride = id
+                    runtime.profileCleared = nil
+                    notes.append("profile → \(config.profiles.first { $0.id == id }?.name ?? "?")")
+                case .clearProfile:
+                    runtime.profileOverride = nil
+                    runtime.profileCleared = true
+                    notes.append("profile cleared")
+                case .killSwitchOn: runtime.killSwitchOverride = true; notes.append("kill switch on")
+                case .killSwitchOff: runtime.killSwitchOverride = false; notes.append("kill switch off")
+                case .killSwitchAuto: runtime.killSwitchOverride = nil; notes.append("kill switch back to its setting")
+                case .learnVPNServers:
+                    let learned = learnVPNServers()
+                    notes.append("\(learned.count) VPN servers known")
+                }
+            }
+        }
+        let triggerNames = matching.map(\.name)
+        let fullDetail = ([detail] + (triggerNames.isEmpty ? [] : ["triggers: " + triggerNames.joined(separator: ", ")]) + notes)
+            .filter { !$0.isEmpty }.joined(separator: " · ")
+        events.append(BIREvent(kind: event.kind, title: event.label, detail: fullDetail, notify: matching.contains { $0.notify }))
+    }
+    return events
+}
+
 // MARK: - Apply
 
 func apply(trigger: String) {
-    let rules = loadRules()
+    ensureDirs()
+    let automation = BIRJSON.load(AutomationConfig.self, from: BIR.automationConfig) ?? AutomationConfig()
+    let loadedRuntime = BIRJSON.load(RuntimeState.self, from: BIR.runtimeState)
+    var runtime = loadedRuntime ?? RuntimeState()
+    let interfaces = InterfaceInventory.snapshot()
+    let table = RouteQuery.table(family: "inet")
+    var events = detectEvents(config: automation, runtime: &runtime, firstRun: loadedRuntime == nil, interfaces: interfaces, table: table)
+
+    // Profile: trigger override > network match > manual choice.
+    let chosen = runtime.profileCleared == true
+        ? (profile: RoutingProfile?.none, reason: "cleared by a trigger")
+        : automation.effectiveProfile(override: runtime.profileOverride, network: runtime.network)
+    let profile = chosen.profile
+    if profile?.id != runtime.activeProfileID, loadedRuntime != nil {
+        events.append(BIREvent(kind: "profileChanged", title: "Profile: \(profile?.name ?? "none")", detail: chosen.reason))
+    }
+    runtime.activeProfileID = profile?.id
+
+    let allRules = loadRules()
+    let rules = allRules.map { rule -> RouteRule in
+        var r = rule
+        if let profile, !profile.ruleIDs.contains(rule.id) { r.enabled = false }
+        return r
+    }
+
     var cache = BIRJSON.load([String: [String]].self, from: BIR.dnsCache) ?? [:]
     let previous = BIRJSON.load([ManagedRoute].self, from: BIR.appliedState) ?? []
-    let interfaces = InterfaceInventory.snapshot()
 
     let plan = RoutePlanner.plan(rules: rules, interfaces: interfaces,
                                  router: { RouteQuery.router(of: $0) },
@@ -205,7 +350,7 @@ func apply(trigger: String) {
     for old in previous where !desiredKeys.contains(old.key) {
         // A rule whose interface is just down keeps its routes recorded so they come back later.
         if liveRules.contains(old.ruleID), statuses[old.ruleID]?.state == .waiting { continue }
-        _ = removeRoute(old, reason: "no longer in any rule")
+        _ = removeRoute(old, reason: "no longer in any active rule")
     }
 
     // 2. Install or correct every desired route.
@@ -234,27 +379,100 @@ func apply(trigger: String) {
     }
 
     var ordered: [RuleStatus] = []
-    for rule in rules {
+    for rule in allRules {
         guard var st = statuses[rule.id] else { continue }
+        if rule.enabled, let profile, !profile.ruleIDs.contains(rule.id) {
+            st.messages.append("Not part of profile “\(profile.name)”")
+        }
         st.finalize()
         ordered.append(st)
     }
 
-    // 3. Kill switch (pf).
-    let ks = applyKillSwitch(routes: plan.routes, interfaces: interfaces, cache: &cache)
+    // 3. Kill switch (pf): trigger override > profile > its own setting.
+    let ksOverride = runtime.killSwitchOverride ?? profile?.killSwitch
+    let ks = applyKillSwitch(routes: plan.routes, interfaces: interfaces, cache: &cache, enabledOverride: ksOverride)
+    let armed = ks?.active == true
+    if let was = runtime.killSwitchArmed, was != armed {
+        events.append(BIREvent(kind: armed ? "killSwitchArmed" : "killSwitchDisarmed", title: armed ? "Kill switch armed" : "Kill switch off"))
+    }
+    runtime.killSwitchArmed = armed
+
+    // 4. Per-domain DNS.
+    let resolvers = applyResolvers(automation.resolvers)
+
+    var status = HelperStatus(updatedAt: Date(), trigger: trigger, rules: ordered, installedRoutes: installed, killSwitch: ks)
+    status.profile = ActiveProfileInfo(id: profile?.id, name: profile?.name, reason: chosen.reason)
+    status.resolvers = resolvers
+    status.tunnelUp = runtime.tunnelUp
+    for st in ordered where st.state == .failed || st.state == .partial {
+        if !(previousStatus?.rules.contains { $0.ruleID == st.ruleID && $0.state == st.state } ?? false) {
+            let name = allRules.first { $0.id == st.ruleID }?.name ?? "rule"
+            events.append(BIREvent(kind: "ruleFailed", title: "Rule “\(name)” \(st.state == .failed ? "failed" : "is only partly applied")",
+                                   detail: st.messages.first ?? ""))
+        }
+    }
 
     do {
-        ensureDirs()
         try BIRJSON.save(installed, to: BIR.appliedState)
-        try BIRJSON.save(HelperStatus(updatedAt: Date(), trigger: trigger, rules: ordered, installedRoutes: installed, killSwitch: ks), to: BIR.status)
+        try BIRJSON.save(status, to: BIR.status)
         try BIRJSON.save(cache, to: BIR.dnsCache)
+        try BIRJSON.save(runtime, to: BIR.runtimeState)
     } catch {
         fail("could not write state: \(error)")
     }
-    if trigger != "daemon" {
-        log("apply (\(trigger)): \(installed.count)/\(plan.routes.count) routes in place for \(rules.filter(\.enabled).count) enabled rules; kill switch \(ks?.active == true ? "on" : "off")")
+    recordEvents(events)
+    if trigger != "daemon" && trigger != "timer" {
+        log("apply (\(trigger)): \(installed.count)/\(plan.routes.count) routes in place; profile \(profile?.name ?? "none"); kill switch \(armed ? "on" : "off")")
     }
-    print("ok: \(installed.count)/\(plan.routes.count) routes for \(rules.filter(\.enabled).count) enabled rules; kill switch \(ks?.active == true ? "on" : "off")")
+    print("ok: \(installed.count)/\(plan.routes.count) routes; profile \(profile?.name ?? "none"); kill switch \(armed ? "on" : "off")")
+}
+
+var previousStatus: HelperStatus? { BIRJSON.load(HelperStatus.self, from: BIR.status) }
+
+// MARK: - Daemon
+
+/// Coalesces bursts of network notifications into one pass.
+final class Scheduler {
+    static let shared = Scheduler()
+    private var generation = 0
+
+    func schedule(_ reason: String, after delay: Double = 2) {
+        generation += 1
+        let g = generation
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard g == self.generation else { return }
+            withLock { apply(trigger: reason) }
+        }
+    }
+}
+
+func runDaemon(interval: Int) {
+    log("daemon started (version \(BIR.version), every \(interval)s and on network changes)")
+    withLock { apply(trigger: "boot") }
+
+    let callback: SCDynamicStoreCallBack = { _, _, _ in
+        DispatchQueue.main.async { Scheduler.shared.schedule("network change") }
+    }
+    if let store = SCDynamicStoreCreate(nil, "com.blueiprouter.helper" as CFString, callback, nil) {
+        let patterns = ["State:/Network/Global/IPv4", "State:/Network/Global/DNS",
+                        "State:/Network/Interface/.*/IPv4", "State:/Network/Interface/.*/Link"] as CFArray
+        SCDynamicStoreSetNotificationKeys(store, nil, patterns)
+        if let source = SCDynamicStoreCreateRunLoopSource(nil, store, 0) {
+            CFRunLoopAddSource(CFRunLoopGetMain(), source, .defaultMode)
+        }
+    } else {
+        log("could not watch network changes; falling back to the timer only")
+    }
+    let timer = Timer(timeInterval: TimeInterval(max(15, interval)), repeats: true) { _ in
+        Scheduler.shared.schedule("timer", after: 0)
+    }
+    RunLoop.main.add(timer, forMode: .default)
+    // Re-read rule files promptly after the app applies (it runs `apply` itself too; this keeps state fresh).
+    signal(SIGHUP, SIG_IGN)
+    let hup = DispatchSource.makeSignalSource(signal: SIGHUP, queue: .main)
+    hup.setEventHandler { Scheduler.shared.schedule("reload", after: 0) }
+    hup.resume()
+    CFRunLoopRun()
 }
 
 func removeAll() {
@@ -262,6 +480,8 @@ func removeAll() {
     var removed = 0
     for old in previous where removeRoute(old, reason: "remove-all") { removed += 1 }
     killSwitchOff(reason: "remove-all")
+    _ = applyResolvers([])
+    try? FileManager.default.removeItem(atPath: BIR.runtimeState)
     ensureDirs()
     try? BIRJSON.save([ManagedRoute](), to: BIR.appliedState)
     try? BIRJSON.save(HelperStatus(updatedAt: Date(), trigger: "remove-all", rules: [], installedRoutes: []), to: BIR.status)
@@ -281,6 +501,11 @@ case "plan":
         print("\(RouteCommands.display(RouteCommands.add(r)))   [\(state)]\(r.keepOnRemove == true ? " keep" : "")")
     }
     for (_, st) in plan.statuses { for m in st.messages { print("note: \(m)") } }
+case "daemon":
+    guard geteuid() == 0 else { fail("must run as root", code: 77) }
+    var interval = 60
+    if let i = args.firstIndex(of: "--interval"), i + 1 < args.count, let v = Int(args[i + 1]) { interval = v }
+    runDaemon(interval: interval)
 case "apply":
     guard geteuid() == 0 else { fail("must run as root", code: 77) }
     var trigger = "manual"
@@ -301,6 +526,6 @@ case "detect-vpn":
         print("learned: \(all.joined(separator: ", "))")
     }
 default:
-    print("usage: blueiprouter-helper apply [--trigger name] | remove-all | killswitch-off | detect-vpn | plan <file> | version")
+    print("usage: blueiprouter-helper daemon [--interval s] | apply [--trigger name] | remove-all | killswitch-off | detect-vpn | plan <file> | version")
     exit(64)
 }

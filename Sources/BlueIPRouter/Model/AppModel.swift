@@ -5,12 +5,17 @@ import Observation
 import UniformTypeIdentifiers
 
 enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
-    case dashboard, rules, killSwitch, routes, pathCheck, adapters, service, backup, activity, about
+    case dashboard, connections, traffic, rules, profiles, killSwitch, routes, pathCheck, dns, adapters, automation, service, backup, activity, about
 
     var id: String { rawValue }
     var title: String {
         switch self {
         case .dashboard: return "Dashboard"
+        case .connections: return "Connections"
+        case .traffic: return "Traffic"
+        case .profiles: return "Profiles"
+        case .dns: return "DNS"
+        case .automation: return "Automation"
         case .rules: return "Routing Rules"
         case .killSwitch: return "Kill Switch"
         case .routes: return "Routing Table"
@@ -25,6 +30,11 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     var symbol: String {
         switch self {
         case .dashboard: return "gauge.with.dots.needle.67percent"
+        case .connections: return "point.3.filled.connected.trianglepath.dotted"
+        case .traffic: return "chart.xyaxis.line"
+        case .profiles: return "square.stack.3d.up"
+        case .dns: return "server.rack"
+        case .automation: return "bolt.badge.automatic"
         case .rules: return "arrow.triangle.branch"
         case .killSwitch: return "hand.raised.square.on.square"
         case .routes: return "tablecells"
@@ -106,6 +116,11 @@ final class AppModel {
     var openAtLogin = LoginItem.isEnabled
     var loginItemNeedsApproval = LoginItem.needsApproval
 
+    var traffic = TrafficHistory.load()
+    var availableUpdate: AvailableUpdate?
+    var checkingForUpdates = false
+    private var lastEgress: String?
+    private var lastPublicRefresh = Date.distantPast
     private var lastBytes: [String: (UInt64, UInt64)] = [:]
     private var lastSample: Date?
     private var loop: Task<Void, Never>?
@@ -127,6 +142,10 @@ final class AppModel {
         await refresh()
         if !workspace.setupCompleted { showSetup = true }
         Task { await refreshPublicIPs() }
+        Task {
+            _ = await Notifier.requestAuthorization()
+            await checkForUpdates(manual: false)
+        }
         loop = Task { [weak self] in
             while !Task.isCancelled {
                 let seconds = self?.workspace.settings.refreshSeconds ?? 5
@@ -141,6 +160,13 @@ final class AppModel {
         let snap = await Task.detached(priority: .userInitiated) { NetworkScanner.scan(rules: rules) }.value
         updateRates(snap)
         net = snap
+        processEvents(snap.events)
+        // Re-check public IPs when the egress interface changes, and every 5 minutes.
+        let egress = snap.internetRoute?.interface
+        if (lastEgress != nil && egress != lastEgress) || Date().timeIntervalSince(lastPublicRefresh) > 300 {
+            Task { await refreshPublicIPs() }
+        }
+        lastEgress = egress
         openAtLogin = LoginItem.isEnabled
         loginItemNeedsApproval = LoginItem.needsApproval
         hasScanned = true
@@ -158,6 +184,8 @@ final class AppModel {
                     }
                     rates[i.name] = TrafficRate(rx: delta(i.snapshot.rxBytes, prev.0) / dt, tx: delta(i.snapshot.txBytes, prev.1) / dt)
                 }
+                let tracked = rates.filter { name, _ in snap.interfaces.contains { $0.name == name && $0.snapshot.isUp && !$0.snapshot.isLoopback } }
+                if traffic.add(rates: tracked, seconds: dt, at: now) { traffic.save() }
             }
         }
         lastSample = now
@@ -206,8 +234,74 @@ final class AppModel {
             if let ip = results[i].v4?.ip, let g = geoCache[ip] { results[i].v4 = g }
             if let ip = results[i].v6?.ip, let g = geoCache[ip] { results[i].v6 = g }
         }
+        let before = publicIPs.first { $0.id == "default" }?.v4
         publicIPs = results.sorted { a, b in a.id == "default" ? true : (b.id == "default" ? false : a.id < b.id) }
         publicIPUpdated = Date()
+        lastPublicRefresh = Date()
+        if let before, let after = publicIPs.first(where: { $0.id == "default" })?.v4, after.ip != before.ip,
+           workspace.settings.notifications.publicIP {
+            let country = before.country != after.country ? " — country \(before.country ?? "?") → \(after.country ?? "?")" : ""
+            Notifier.post("Public IP changed\(after.flag.map { " " + $0 } ?? "")",
+                          "\(before.ip) → \(after.ip)\(country)\n\([after.location, after.org ?? ""].filter { !$0.isEmpty }.joined(separator: " · "))")
+            log("Public IP changed", ok: true, "\(before.ip) → \(after.ip)")
+        }
+    }
+
+    // MARK: Notifications & updates
+
+    /// Notifies about helper events that are new since the last look.
+    private func processEvents(_ events: [BIREvent]) {
+        let key = "lastNotifiedEventDate"
+        guard let newest = events.last?.date else { return }
+        guard let seen = UserDefaults.standard.object(forKey: key) as? Date else {
+            UserDefaults.standard.set(newest, forKey: key)
+            return
+        }
+        let fresh = events.filter { $0.date > seen }
+        guard !fresh.isEmpty else { return }
+        UserDefaults.standard.set(newest, forKey: key)
+        let prefs = workspace.settings.notifications
+        for e in fresh.suffix(5) where prefs.wants(e) {
+            Notifier.post(e.title, e.detail, id: e.id.uuidString)
+        }
+    }
+
+    func checkForUpdates(manual: Bool) async {
+        let key = "lastUpdateCheck"
+        if !manual {
+            guard workspace.settings.checkForUpdates else { return }
+            if let last = UserDefaults.standard.object(forKey: key) as? Date, Date().timeIntervalSince(last) < 86400 {
+                return
+            }
+        }
+        checkingForUpdates = true
+        defer { checkingForUpdates = false }
+        do {
+            let update = try await UpdateChecker.latest()
+            UserDefaults.standard.set(Date(), forKey: key)
+            availableUpdate = update
+            if let update {
+                if !manual && workspace.settings.notifications.updates {
+                    Notifier.post("BlueIPRouter \(update.version) is available", "Open the app to download it.")
+                }
+                log("Update available: \(update.version)", ok: true)
+            } else if manual {
+                alert = AlertInfo(title: "You're up to date", message: "BlueIPRouter \(BIR.version) is the latest version.")
+            }
+        } catch {
+            if manual { showError("Could not check for updates", error.localizedDescription) }
+        }
+    }
+
+    func describe(_ action: TriggerAction) -> String {
+        switch action {
+        case .activateProfile(let id): return "switch to “\(workspace.automation.profiles.first { $0.id == id }?.name ?? "deleted profile")”"
+        case .clearProfile: return "clear the profile"
+        case .killSwitchOn: return "kill switch on"
+        case .killSwitchOff: return "kill switch off"
+        case .killSwitchAuto: return "kill switch to its setting"
+        case .learnVPNServers: return "re-learn VPN servers"
+        }
     }
 
     // MARK: Derived state
@@ -238,7 +332,18 @@ final class AppModel {
         return workspace.rules.filter { pending.contains($0.id) && net.liveRoutes[$0.id]?.allLive == true }
     }
 
-    var pendingCount: Int { pendingChanges.count + (killSwitchPending ? 1 : 0) }
+    var automationPending: Bool {
+        guard let applied = net.appliedAutomation else { return !workspace.automation.isEmpty }
+        return applied != workspace.automation
+    }
+
+    var pendingCount: Int { pendingChanges.count + (killSwitchPending ? 1 : 0) + (automationPending ? 1 : 0) }
+
+    /// The installed LaunchDaemon predates the current app (e.g. the old timer-only service).
+    var daemonOutdated: Bool {
+        guard net.service.daemonInstalled, let installed = net.installedDaemonPlist else { return false }
+        return installed != Privileged.daemonPlist(interval: workspace.settings.serviceIntervalSeconds)
+    }
     var hasPending: Bool { pendingCount > 0 }
 
     /// A full-tunnel VPN is currently up.
@@ -347,6 +452,7 @@ final class AppModel {
     func discardChanges() {
         workspace.rules = net.appliedRules
         if let ks = net.appliedKillSwitch { workspace.killSwitch = ks } else { workspace.killSwitch.enabled = false }
+        workspace.automation = net.appliedAutomation ?? AutomationConfig()
         log("Discarded pending changes", ok: true)
     }
 
@@ -365,6 +471,8 @@ final class AppModel {
         do {
             let staging = Storage.stagingDir
             let k = staging.appendingPathComponent("killswitch.json").path
+            let au = staging.appendingPathComponent("automation.json").path
+            try BIRJSON.save(workspace.automation, to: au)
             try BIRJSON.save(workspace.killSwitch, to: k)
             let p = staging.appendingPathComponent("rules.json").path
             let s = staging.appendingPathComponent("session-rules.json").path
@@ -375,14 +483,19 @@ final class AppModel {
                 "install -o root -g wheel -m 644 \(shq(p)) \(shq(BIR.persistentRules))",
                 "install -o root -g wheel -m 644 \(shq(s)) \(shq(BIR.sessionRules))",
                 "install -o root -g wheel -m 644 \(shq(k)) \(shq(BIR.killSwitchConfig))",
+                "install -o root -g wheel -m 644 \(shq(au)) \(shq(BIR.automationConfig))",
             ]
             cmds += extraCommands
             cmds.append("\(shq(BIR.helperBinary)) apply --trigger app")
             // Persistent rules and the kill switch only survive reboots with the background service,
             // so the first Apply that needs it installs it in the same (single) admin prompt.
             let needsService = workspace.rules.contains { $0.enabled && $0.persistent } || workspace.killSwitch.enabled
-            if needsService && !net.service.daemonInstalled {
+                || !workspace.automation.isEmpty
+            if (needsService && !net.service.daemonInstalled) || daemonOutdated {
                 cmds += try Privileged.installDaemonCommands(interval: workspace.settings.serviceIntervalSeconds)
+            } else if net.service.daemonInstalled {
+                // Restart the long-running service so it runs the helper binary just installed.
+                cmds.append("launchctl kickstart -k system/\(BIR.helperLabel)")
             }
             if await runPrivileged(title, cmds) {
                 autoBackup("Applied")
@@ -426,6 +539,12 @@ final class AppModel {
         openAtLogin = LoginItem.isEnabled
         loginItemNeedsApproval = LoginItem.needsApproval
         if loginItemNeedsApproval { LoginItem.openSystemSettings() }
+    }
+
+    /// Speed of the interface that carries internet traffic (the VPN tunnel when it is up).
+    var internetRate: TrafficRate {
+        guard let i = net.internetRoute?.interface, let r = rates[i] else { return TrafficRate(rx: 0, tx: 0) }
+        return r
     }
 
     var backgroundServiceRunning: Bool { net.service.daemonInstalled && net.service.loaded }
@@ -499,7 +618,7 @@ final class AppModel {
         var cmds: [String] = []
         if o.removeRoutes && net.service.helperInstalled { cmds.append("\(shq(BIR.helperBinary)) remove-all") }
         if o.deleteRules {
-            cmds.append("rm -f \(shq(BIR.persistentRules)) \(shq(BIR.sessionRules)) \(shq(BIR.killSwitchConfig)) \(shq(BIR.learnedServers))")
+            cmds.append("rm -f \(shq(BIR.persistentRules)) \(shq(BIR.sessionRules)) \(shq(BIR.killSwitchConfig)) \(shq(BIR.learnedServers)) \(shq(BIR.automationConfig)) \(shq(BIR.runtimeState))")
         }
         if o.uninstallService {
             cmds += Privileged.removeDaemonCommands
@@ -512,6 +631,7 @@ final class AppModel {
         if o.deleteRules {
             workspace.rules = []
             workspace.killSwitch = KillSwitchConfig()
+            workspace.automation = AutomationConfig()
         }
         if o.resetAliasesAndSettings {
             workspace.aliases = [:]
@@ -526,7 +646,7 @@ final class AppModel {
         BackupBundle(createdAt: Date(), appVersion: BIR.version, hostName: Host.current().localizedName ?? "Mac",
                      reason: reason, rules: workspace.rules, aliases: workspace.aliases,
                      settings: workspace.settings, routingSnapshot: net.routesV4,
-                     killSwitch: workspace.killSwitch)
+                     killSwitch: workspace.killSwitch, automation: workspace.automation)
     }
 
     func autoBackup(_ reason: String) {
@@ -570,6 +690,7 @@ final class AppModel {
             }
         }
         if let ks = bundle.killSwitch, replace || includeSettings { workspace.killSwitch = ks }
+        if let au = bundle.automation, replace || includeSettings { workspace.automation = au }
         if includeSettings {
             workspace.aliases.merge(bundle.aliases) { _, new in new }
             workspace.settings = bundle.settings

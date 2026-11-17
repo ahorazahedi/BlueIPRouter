@@ -12,6 +12,8 @@ BUNDLE_ID="${BUNDLE_ID:-com.blueiprouter.app}"
 # Single source of truth for the version: BIR.version in Sources/BlueIPRouterCore/Models.swift
 VERSION=$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' "$ROOT/Sources/BlueIPRouterCore/Models.swift")
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
+# GitHub repository the app checks for updates (owner/name)
+REPOSITORY="${REPOSITORY:-ahorazahedi/BlueIPRouter}"
 
 echo "==> Compiling (release)"
 swift build -c release
@@ -49,6 +51,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
+  <key>BlueIPRouterRepository</key><string>$REPOSITORY</string>
 </dict>
 </plist>
 PLIST
