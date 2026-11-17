@@ -43,7 +43,7 @@ struct RulesView: View {
                     Button("New Rule") { model.newRule() }.buttonStyle(.borderedProminent)
                     Button("Import Existing Static Routes…") { model.showImport = true }
                 }
-                .frame(maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 table
             }

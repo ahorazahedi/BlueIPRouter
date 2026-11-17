@@ -150,6 +150,7 @@ struct Banner: View {
 
 struct PendingBanner: View {
     @Environment(AppModel.self) private var model
+    @State private var confirmDiscard = false
 
     var body: some View {
         if model.hasPending {
@@ -161,9 +162,14 @@ struct PendingBanner: View {
                    message: items.joined(separator: " · ") + (model.liveButUnmanaged.isEmpty ? "" :
                        "\nThe routes of \(model.liveButUnmanaged.count) of these already exist on this Mac (added outside BlueIPRouter). Applying takes them over without interrupting traffic and makes them persistent."),
                    actions: AnyView(HStack {
-                       Button("Discard") { model.discardChanges() }
+                       Button("Discard…") { confirmDiscard = true }
                        Button("Apply Changes") { Task { await model.apply() } }.buttonStyle(.borderedProminent)
                    }))
+                .confirmationDialog("Discard \(model.pendingCount) unapplied change\(model.pendingCount == 1 ? "" : "s")?", isPresented: $confirmDiscard) {
+                    Button("Discard Changes", role: .destructive) { model.discardChanges() }
+                } message: {
+                    Text("Your edits go back to what is applied on this Mac. This cannot be undone.")
+                }
         }
     }
 }

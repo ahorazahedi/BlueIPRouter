@@ -23,7 +23,7 @@ struct BlockListView: View {
                 } description: {
                     Text("Add an IP (203.0.113.10), a network (203.0.113.0/24 or 2001:db8::/32) or a domain (ads.example.com). You can also block from Connections or Path Check.")
                 }
-                .frame(maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Table(entries, selection: $selection) {
                     TableColumn("On") { e in

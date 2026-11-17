@@ -17,7 +17,7 @@ struct ImportRoutesSheet: View {
             if candidates.isEmpty {
                 ContentUnavailableView("No static routes to import", systemImage: "checkmark.circle",
                                        description: Text("Every static route is already managed by a rule or belongs to the system or a VPN client."))
-                    .frame(height: 220)
+                    .frame(maxWidth: .infinity).frame(height: 220)
             } else {
                 Table(candidates, selection: $chosen) {
                     TableColumn("Destination") { c in Text(c.destination).font(.body.monospaced()) }

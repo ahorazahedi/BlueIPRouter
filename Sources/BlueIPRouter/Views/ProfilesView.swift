@@ -28,7 +28,7 @@ struct ProfilesView: View {
                     } actions: {
                         Button("New Profile") { editing = RoutingProfile(name: "", ruleIDs: model.workspace.rules.map(\.id)) }
                     }
-                    .frame(minHeight: 240)
+                    .frame(maxWidth: .infinity, minHeight: 240)
                 }
                 ForEach(auto.profiles) { p in profileCard(p) }
             }

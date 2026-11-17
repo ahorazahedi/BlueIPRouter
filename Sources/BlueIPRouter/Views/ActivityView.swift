@@ -13,7 +13,7 @@ struct ActivityView: View {
             if model.activity.isEmpty {
                 ContentUnavailableView("No activity yet", systemImage: "list.bullet.rectangle",
                                        description: Text("Applied changes, adapter actions and path checks appear here."))
-                    .frame(maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Table(model.activity, selection: $selection) {
                     TableColumn("") { e in
