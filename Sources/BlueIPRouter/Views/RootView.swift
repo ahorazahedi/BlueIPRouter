@@ -20,6 +20,7 @@ struct RootView: View {
                     row(.service)
                     row(.backup)
                     row(.activity)
+                    row(.about)
                 }
             }
             .listStyle(.sidebar)
@@ -37,6 +38,7 @@ struct RootView: View {
                 case .service: ServiceView()
                 case .backup: BackupView()
                 case .activity: ActivityView()
+                case .about: ScrollView { AboutView() }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

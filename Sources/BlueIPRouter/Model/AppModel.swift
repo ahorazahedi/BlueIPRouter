@@ -5,7 +5,7 @@ import Observation
 import UniformTypeIdentifiers
 
 enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
-    case dashboard, rules, killSwitch, routes, pathCheck, adapters, service, backup, activity
+    case dashboard, rules, killSwitch, routes, pathCheck, adapters, service, backup, activity, about
 
     var id: String { rawValue }
     var title: String {
@@ -19,6 +19,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .service: return "Persistence"
         case .backup: return "Backup & Restore"
         case .activity: return "Activity Log"
+        case .about: return "About"
         }
     }
     var symbol: String {
@@ -32,6 +33,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .service: return "clock.arrow.circlepath"
         case .backup: return "externaldrive.badge.timemachine"
         case .activity: return "list.bullet.rectangle"
+        case .about: return "info.circle"
         }
     }
 }

@@ -103,6 +103,10 @@ Neither command changes anything, and neither needs root:
 * Routes added with **Add Route** in the routing table are one-off and are never restored.
 * Apps can't pin traffic to some tunnel interfaces, so the public IP of those paths can't be measured directly.
 
+## Author
+
+Created by **Ahora Zahedi** · [GitHub](https://github.com/ahorazahedi) · [Website](https://ahora.bluedopmaine.io/)
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

@@ -27,6 +27,7 @@ struct BlueIPRouterApp: App {
         }
         .defaultSize(width: 1320, height: 860)
         .commands {
+            CommandGroup(replacing: .appInfo) { AboutMenuButton() }
             CommandGroup(after: .newItem) {
                 Button("New Routing Rule") { model.selection = .rules; model.newRule() }
                     .keyboardShortcut("n")
@@ -48,6 +49,12 @@ struct BlueIPRouterApp: App {
                 Button("Setup Assistant…") { model.showSetup = true }
             }
         }
+
+        Window("About BlueIPRouter", id: "about") {
+            AboutView(compact: true).frame(width: 520)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
 
         MenuBarExtra(isInserted: $menuBarEnabled) {
             MenuBarView().environment(model)
