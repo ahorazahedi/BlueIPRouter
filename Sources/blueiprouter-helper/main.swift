@@ -251,6 +251,9 @@ func apply(trigger: String) {
     } catch {
         fail("could not write state: \(error)")
     }
+    if trigger != "daemon" {
+        log("apply (\(trigger)): \(installed.count)/\(plan.routes.count) routes in place for \(rules.filter(\.enabled).count) enabled rules; kill switch \(ks?.active == true ? "on" : "off")")
+    }
     print("ok: \(installed.count)/\(plan.routes.count) routes for \(rules.filter(\.enabled).count) enabled rules; kill switch \(ks?.active == true ? "on" : "off")")
 }
 

@@ -50,6 +50,8 @@ struct ServiceView: View {
                     .font(.callout)
                 }
 
+                StartupCard()
+
                 Card("Rule persistence", symbol: "list.bullet") {
                     if model.workspace.rules.isEmpty { Text("No rules").foregroundStyle(.secondary) }
                     ForEach(model.workspace.rules) { rule in

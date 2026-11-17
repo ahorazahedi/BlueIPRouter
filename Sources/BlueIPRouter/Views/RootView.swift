@@ -67,6 +67,7 @@ struct RootView: View {
             }
         }
         .sheet(isPresented: $model.showImport) { ImportRoutesSheet().environment(model) }
+        .sheet(isPresented: $model.showSetup) { SetupAssistant().environment(model) }
         .sheet(item: $model.editingRule) { rule in
             RuleEditor(rule: rule).environment(model)
         }

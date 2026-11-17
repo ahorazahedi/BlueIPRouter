@@ -43,6 +43,7 @@ struct Workspace: Codable {
     var aliases: [String: String] = [:]
     var settings = AppSettings()
     var killSwitch = KillSwitchConfig()
+    var setupCompleted = false
 
     init() {}
 
@@ -52,6 +53,7 @@ struct Workspace: Codable {
         aliases = try c.decodeIfPresent([String: String].self, forKey: .aliases) ?? [:]
         settings = (try? c.decodeIfPresent(AppSettings.self, forKey: .settings)) ?? AppSettings()
         killSwitch = (try? c.decodeIfPresent(KillSwitchConfig.self, forKey: .killSwitch)) ?? KillSwitchConfig()
+        setupCompleted = (try? c.decodeIfPresent(Bool.self, forKey: .setupCompleted)) ?? false
     }
 }
 

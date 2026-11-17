@@ -100,6 +100,9 @@ final class AppModel {
     var helperLog = ""
     var hasScanned = false
     var showImport = false
+    var showSetup = false
+    var openAtLogin = LoginItem.isEnabled
+    var loginItemNeedsApproval = LoginItem.needsApproval
 
     private var lastBytes: [String: (UInt64, UInt64)] = [:]
     private var lastSample: Date?
@@ -120,6 +123,7 @@ final class AppModel {
         guard loop == nil else { return }
         backups = Storage.listBackups()
         await refresh()
+        if !workspace.setupCompleted { showSetup = true }
         Task { await refreshPublicIPs() }
         loop = Task { [weak self] in
             while !Task.isCancelled {
@@ -135,6 +139,8 @@ final class AppModel {
         let snap = await Task.detached(priority: .userInitiated) { NetworkScanner.scan(rules: rules) }.value
         updateRates(snap)
         net = snap
+        openAtLogin = LoginItem.isEnabled
+        loginItemNeedsApproval = LoginItem.needsApproval
         hasScanned = true
     }
 
@@ -407,6 +413,20 @@ final class AppModel {
             showError("Background service", error.localizedDescription)
         }
     }
+
+    func setOpenAtLogin(_ enabled: Bool) {
+        do {
+            try LoginItem.set(enabled)
+            log(enabled ? "Turned on Open at Login" : "Turned off Open at Login", ok: true)
+        } catch {
+            showError("Open at Login", error.localizedDescription)
+        }
+        openAtLogin = LoginItem.isEnabled
+        loginItemNeedsApproval = LoginItem.needsApproval
+        if loginItemNeedsApproval { LoginItem.openSystemSettings() }
+    }
+
+    var backgroundServiceRunning: Bool { net.service.daemonInstalled && net.service.loaded }
 
     func loadHelperLog() { helperLog = NetworkScanner.tailLog(BIR.log) }
 

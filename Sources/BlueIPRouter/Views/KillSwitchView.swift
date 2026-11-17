@@ -165,50 +165,87 @@ struct KillSwitchView: View {
     }
 
     private var allowCard: some View {
-        @Bindable var model = model
-        return Card("Allowed through guarded interfaces", symbol: "checkmark.shield") {
-            Toggle("Local networks (\(NetworkFacts.attachedNetworks(model.net.interfaces.map(\.snapshot), names: ks.interfaces).joined(separator: ", ")), link-local, multicast)",
-                   isOn: $model.workspace.killSwitch.allowLocalNetworks)
-            Toggle("Destinations of your routing rules", isOn: $model.workspace.killSwitch.allowRuleDestinations)
-            Toggle("DNS to the system resolvers (\(model.net.systemDNS.joined(separator: ", ")))", isOn: $model.workspace.killSwitch.allowDNS)
-            Toggle("DHCP (keeps Wi-Fi getting an address)", isOn: $model.workspace.killSwitch.allowDHCP)
-            Toggle("Learn VPN servers automatically (xray, sing-box, v2ray, OpenVPN…)", isOn: $model.workspace.killSwitch.learnVPNServers)
+        Card("Allowed through guarded interfaces", symbol: "checkmark.shield") {
+            allowToggles
             Divider()
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("VPN servers learned").fontWeight(.medium)
-                    Text(model.net.learnedServers.isEmpty ? "None yet. Connect your VPN, then press Detect." : model.net.learnedServers.joined(separator: ", "))
-                        .font(.callout.monospaced()).foregroundStyle(model.net.learnedServers.isEmpty ? .orange : .secondary)
-                }
-                Spacer()
-                Button("Detect VPN Servers") { Task { await model.detectVPNServers() } }
-                    .disabled(model.fullTunnel == nil)
-                    .help(model.fullTunnel == nil ? "Connect your full-tunnel VPN first" : "Finds the servers your VPN core is connected to right now")
-                Button("Forget") { Task { await model.forgetLearnedServers() } }.disabled(model.net.learnedServers.isEmpty)
-            }
+            learnedServersRow
             Divider()
-            Text("Extra allowed destinations (one per line: IP, CIDR or domain)").fontWeight(.medium)
-            TextEditor(text: $allowText)
-                .font(.body.monospaced()).frame(minHeight: 80)
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.1)))
-                .onChange(of: allowText) { _, v in
-                    model.workspace.killSwitch.allow = v.split(whereSeparator: { $0 == "\n" || $0 == "," || $0 == " " }).map(String.init)
-                }
-            if model.net.learnedServers.isEmpty && ks.allow.isEmpty {
-                Label("Without the VPN server allowed, the VPN cannot reconnect while this mode is on.", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange).font(.callout)
-            }
+            extraAllowEditor
         }
     }
 
-    private var rulesPreview: some View {
+    private var localNetworksLabel: String {
+        let nets = NetworkFacts.attachedNetworks(model.net.interfaces.map(\.snapshot), names: ks.interfaces)
+        return "Local networks (" + nets.joined(separator: ", ") + "), link-local, multicast"
+    }
+
+    private var dnsLabel: String {
+        "DNS to the system resolvers (" + model.net.systemDNS.joined(separator: ", ") + ")"
+    }
+
+    @ViewBuilder
+    private var allowToggles: some View {
+        @Bindable var model = model
+        Toggle(localNetworksLabel, isOn: $model.workspace.killSwitch.allowLocalNetworks)
+        Toggle("Destinations of your routing rules", isOn: $model.workspace.killSwitch.allowRuleDestinations)
+        Toggle(dnsLabel, isOn: $model.workspace.killSwitch.allowDNS)
+        Toggle("DHCP (keeps Wi-Fi getting an address)", isOn: $model.workspace.killSwitch.allowDHCP)
+        Toggle("Learn VPN servers automatically (xray, sing-box, v2ray, OpenVPN…)", isOn: $model.workspace.killSwitch.learnVPNServers)
+    }
+
+    private var learnedServersRow: some View {
+        let learned = model.net.learnedServers
+        let noTunnel = model.fullTunnel == nil
+        let text: String = learned.isEmpty ? "None yet. Connect your VPN, then press Detect." : learned.joined(separator: ", ")
+        let color: Color = learned.isEmpty ? .orange : .secondary
+        return HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("VPN servers learned").fontWeight(.medium)
+                Text(text).font(.callout.monospaced()).foregroundStyle(color)
+            }
+            Spacer()
+            Button("Detect VPN Servers") { Task { await model.detectVPNServers() } }
+                .disabled(noTunnel)
+                .help(noTunnel ? "Connect your full-tunnel VPN first" : "Finds the servers your VPN core is connected to right now")
+            Button("Forget") { Task { await model.forgetLearnedServers() } }.disabled(learned.isEmpty)
+        }
+    }
+
+    @ViewBuilder
+    private var extraAllowEditor: some View {
+        Text("Extra allowed destinations (one per line: IP, CIDR or domain)").fontWeight(.medium)
+        TextEditor(text: $allowText)
+            .font(.body.monospaced()).frame(minHeight: 80)
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.1)))
+            .onChange(of: allowText) { _, v in
+                let items: [String] = v.split(whereSeparator: { $0 == "\n" || $0 == "," || $0 == " " }).map(String.init)
+                model.workspace.killSwitch.allow = items
+            }
+        if model.net.learnedServers.isEmpty && ks.allow.isEmpty {
+            Label("Without the VPN server allowed, the VPN cannot reconnect while this mode is on.", systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange).font(.callout)
+        }
+    }
+
+    private func previewText() -> String {
         let cfg = ks
-        let blocked = cfg.blockLists.filter(\.enabled).flatMap(\.entries).compactMap(CIDR.normalize)
-        let allowed = (cfg.allow.compactMap(CIDR.normalize) + model.net.learnedServers.compactMap(CIDR.normalize)
-            + (cfg.allowLocalNetworks ? NetworkFacts.attachedNetworks(model.net.interfaces.map(\.snapshot), names: cfg.interfaces) + KillSwitchCompiler.linkLocalRanges : [])
-            + (cfg.allowRuleDestinations ? (model.net.helperStatus?.installedRoutes.map(\.key) ?? []) : []))
-        let text = KillSwitchCompiler.compile(mode: cfg.mode, interfaces: cfg.interfaces, blocked: blocked, allowed: allowed,
-                                              dnsServers: cfg.allowDNS ? model.net.systemDNS : [], allowDHCP: cfg.allowDHCP)
+        let blocked: [String] = cfg.blockLists.filter(\.enabled).flatMap(\.entries).compactMap(CIDR.normalize)
+        var allowed: [String] = cfg.allow.compactMap(CIDR.normalize)
+        allowed += model.net.learnedServers.compactMap(CIDR.normalize)
+        if cfg.allowLocalNetworks {
+            allowed += NetworkFacts.attachedNetworks(model.net.interfaces.map(\.snapshot), names: cfg.interfaces)
+            allowed += KillSwitchCompiler.linkLocalRanges
+        }
+        if cfg.allowRuleDestinations {
+            allowed += model.net.helperStatus?.installedRoutes.map(\.key) ?? []
+        }
+        let dns: [String] = cfg.allowDNS ? model.net.systemDNS : []
+        return KillSwitchCompiler.compile(mode: cfg.mode, interfaces: cfg.interfaces, blocked: blocked, allowed: allowed,
+                                          dnsServers: dns, allowDHCP: cfg.allowDHCP)
+    }
+
+    private var rulesPreview: some View {
+        let text = previewText()
         return VStack(alignment: .leading, spacing: 12) {
             Text("pf rules for anchor \(BIR.pfAnchor)").font(.title3.weight(.semibold))
             Text("Domains are resolved by the helper when applied, so they are not shown here.").font(.caption).foregroundStyle(.secondary)

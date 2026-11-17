@@ -9,13 +9,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// With the menu bar icon on, closing the window keeps the app running there.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { !UIPrefs.menuBarEnabled }
 }
 
 @main
 struct BlueIPRouterApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel()
+    @AppStorage(UIPrefs.menuBarKey) private var menuBarEnabled = true
 
     var body: some Scene {
         Window("BlueIPRouter", id: "main") {
@@ -42,7 +44,17 @@ struct BlueIPRouterApp: App {
                     .keyboardShortcut("k")
                 Button("Flush DNS Cache") { Task { await model.flushDNS() } }
             }
+            CommandGroup(after: .help) {
+                Button("Setup Assistant…") { model.showSetup = true }
+            }
         }
+
+        MenuBarExtra(isInserted: $menuBarEnabled) {
+            MenuBarView().environment(model)
+        } label: {
+            Image(systemName: model.net.helperStatus?.killSwitch?.active == true ? "arrow.triangle.branch.circle.fill" : "arrow.triangle.branch")
+        }
+        .menuBarExtraStyle(.window)
 
         Settings {
             SettingsView().environment(model).frame(width: 520)

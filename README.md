@@ -14,25 +14,40 @@ Built with SwiftUI. Requires macOS 14 or later.
 | **Routing Table** | The live kernel routing table (IPv4 and IPv6), filters, the owner of each route, a legend for route flags, delete a route, add a one-off route, import static routes created elsewhere as rules |
 | **Path Check** | Enter an IP or domain to see the DNS answers, the route the kernel uses, the interface and gateway, why that route matched, whether the kill switch blocks it, a TCP test and a live traceroute |
 | **Network Adapters** | Addresses, MAC, router, DNS, traffic counters and aliases per interface. Turn an interface up or down, Wi-Fi power, renew DHCP, set the MTU, set DNS servers, flush the DNS cache |
-| **Persistence** | A background LaunchDaemon that re-applies everything at boot and on a schedule: it re-resolves domains, follows router changes and repairs missing routes |
+| **Persistence** | A background service that re-applies everything at boot and on a schedule: it re-resolves domains, follows router changes and repairs missing routes. Startup switches for the service, Open at Login and the menu bar icon |
+| **Menu bar** | Public IP, egress interface, managed routes, kill switch state and Apply, without opening the window. The app keeps running there when its window is closed |
+| **Setup Assistant** | A first-run checklist: install the background service, open at login, menu bar icon, import existing static routes, create the first rule |
 | **Backup & Restore** | Export and import JSON, automatic snapshots (after every Apply and before every restore or reset), and reset to default |
 
 ## Install
 
+No Terminal needed.
+
+1. Download `BlueIPRouter-<version>.zip` from the [latest release](https://github.com/ahorazahedi/BlueIPRouter/releases/latest) and unzip it.
+2. Drag **BlueIPRouter.app** into **Applications**.
+3. Open it. The first time, macOS may say it cannot verify the developer, because the app is not notarized. Click **Done**, then open **System Settings › Privacy & Security**, scroll down and click **Open Anyway** next to BlueIPRouter.
+4. The **Setup Assistant** opens. Install the background service (one administrator password), choose whether the app opens at login, and import any static routes you already have.
+
+From then on, everything is controlled from the app:
+
+* **At boot:** the background service applies your rules and kill switch, even before you log in and when the app is closed. Switch it under **Persistence › Startup**.
+* **At login:** turn on **Open BlueIPRouter at login** in the same place. If macOS asks for approval, it opens **System Settings › General › Login Items** for you.
+* **Menu bar:** the icon shows status and quick actions. Closing the window keeps the app running there. You can turn the icon off.
+
+To uninstall, open **Backup & Restore › Reset to Default**, turn on **Uninstall the background service and helper**, then delete the app.
+
+### Build from source
+
+You need the Xcode command-line tools (Swift 5.10 or newer).
+
 ```sh
 git clone https://github.com/ahorazahedi/BlueIPRouter.git && cd BlueIPRouter
-sh scripts/build.sh --install     # builds and copies BlueIPRouter.app to ~/Applications
-```
-
-You need the Xcode command-line tools (Swift 5.10 or newer). Other build options:
-
-```sh
-sh scripts/build.sh                              # build/BlueIPRouter.app only
-sh scripts/build.sh --zip                        # also build/BlueIPRouter-<version>.zip
+sh scripts/build.sh --install                     # builds and copies BlueIPRouter.app to ~/Applications
+sh scripts/build.sh --zip                         # also creates build/BlueIPRouter-<version>.zip
 BUNDLE_ID=com.example.blueiprouter sh scripts/build.sh   # use your own bundle identifier
 ```
 
-The build is ad-hoc signed. If you download a build from Releases, macOS Gatekeeper may block it. Right-click the app and choose **Open**, or build it yourself.
+Pushing a tag such as `v1.0.1` makes GitHub Actions build the zip and attach it to a release.
 
 ## How it works
 
