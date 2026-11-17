@@ -468,7 +468,7 @@ struct SpeedDial: View {
                 Canvas { ctx, sz in
                     let c = CGPoint(x: sz.width / 2, y: sz.height / 2)
                     func tick(_ t: Double, major: Bool) {
-                        let a = Angle.degrees(Self.start + Self.sweep * t).radians
+                        let a = CGFloat(Angle.degrees(Self.start + Self.sweep * t).radians)
                         let r1 = radius - 16, r2 = radius - (major ? 27 : 21)
                         var p = Path()
                         p.move(to: CGPoint(x: c.x + cos(a) * r1, y: c.y + sin(a) * r1))
@@ -483,7 +483,7 @@ struct SpeedDial: View {
 
                 // Scale labels
                 ForEach(marks, id: \.self) { mark in
-                    let a = Angle.degrees(Self.start + Self.sweep * Self.fraction(mark)).radians
+                    let a = CGFloat(Angle.degrees(Self.start + Self.sweep * Self.fraction(mark)).radians)
                     Text(label(mark))
                         .font(.system(size: 10, weight: .medium, design: .rounded))
                         .foregroundStyle(Self.fraction(mark) <= f ? Color.primary : Color.secondary)
