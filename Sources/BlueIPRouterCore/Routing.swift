@@ -22,7 +22,7 @@ public struct RouteLookup: Codable, Hashable, Sendable {
     }
 
     public var matchedRouteLabel: String {
-        if isDefault { return "default (0.0.0.0/0)" }
+        if isDefault { return CoreL10n.tr("default (0.0.0.0/0)", "по умолчанию (0.0.0.0/0)") }
         if isHost { return "\(destination)/32" }
         if let p = prefix { return "\(destination)/\(p)" }
         return destination
@@ -106,14 +106,32 @@ public enum RouteQuery {
         return IPv4.isValid(value) ? value : nil
     }
 
-    public static let flagLegend: [(String, String)] = [
-        ("U", "Up"), ("G", "Uses a gateway"), ("H", "Host route (single IP)"), ("S", "Static (added manually or by an app)"),
-        ("C", "Cloning"), ("c", "Protocol-specific cloning"), ("L", "Link-layer (ARP/NDP) entry"), ("W", "Cloned from another route"),
-        ("I", "Scoped to one interface"), ("g", "Gateway route"), ("m", "Multicast"), ("R", "Reject"), ("B", "Blackhole"),
-        ("b", "Broadcast"), ("r", "Router (default router entry)"), ("i", "Interface route"), ("D", "Dynamic (redirect)"),
-        ("M", "Modified (redirect)"), ("A", "Address-configuration route"), ("1", "Protocol-specific flag 1"),
-        ("2", "Protocol-specific flag 2"), ("3", "Protocol-specific flag 3"),
-    ]
+    public static var flagLegend: [(String, String)] {
+        [
+            ("U", CoreL10n.tr("Up", "Активен (Up)")),
+            ("G", CoreL10n.tr("Uses a gateway", "Через шлюз")),
+            ("H", CoreL10n.tr("Host route (single IP)", "Маршрут на узел (один IP)")),
+            ("S", CoreL10n.tr("Static (added manually or by an app)", "Статический (добавлен вручную или приложением)")),
+            ("C", CoreL10n.tr("Cloning", "Клонирующий (Cloning)")),
+            ("c", CoreL10n.tr("Protocol-specific cloning", "Клонирующий для протокола")),
+            ("L", CoreL10n.tr("Link-layer (ARP/NDP) entry", "Канальный уровень (ARP/NDP)")),
+            ("W", CoreL10n.tr("Cloned from another route", "Клонирован из другого маршрута")),
+            ("I", CoreL10n.tr("Scoped to one interface", "Привязан к одному интерфейсу")),
+            ("g", CoreL10n.tr("Gateway route", "Шлюзовый маршрут")),
+            ("m", CoreL10n.tr("Multicast", "Мультикаст")),
+            ("R", CoreL10n.tr("Reject", "Отклонять (Reject)")),
+            ("B", CoreL10n.tr("Blackhole", "Чёрная дыра (Blackhole)")),
+            ("b", CoreL10n.tr("Broadcast", "Широковещательный")),
+            ("r", CoreL10n.tr("Router (default router entry)", "Роутер (маршрут роутера по умолчанию)")),
+            ("i", CoreL10n.tr("Interface route", "Маршрут интерфейса")),
+            ("D", CoreL10n.tr("Dynamic (redirect)", "Динамический (редирект)")),
+            ("M", CoreL10n.tr("Modified (redirect)", "Изменённый (редирект)")),
+            ("A", CoreL10n.tr("Address-configuration route", "Маршрут автонастройки адреса")),
+            ("1", CoreL10n.tr("Protocol-specific flag 1", "Флаг протокола 1")),
+            ("2", CoreL10n.tr("Protocol-specific flag 2", "Флаг протокола 2")),
+            ("3", CoreL10n.tr("Protocol-specific flag 3", "Флаг протокола 3")),
+        ]
+    }
 }
 
 /// Builds the exact `route` arguments for a managed route.
@@ -186,7 +204,7 @@ public enum RoutePlanner {
             case .interfaceDirect(let i):
                 guard let s = interfaces.first(where: { $0.name == i }), s.isUp else {
                     st.state = .waiting
-                    st.messages.append("Interface \(i) is not present or is down")
+                    st.messages.append(CoreL10n.tr("Interface %@ is not present or is down", "Интерфейс %@ отсутствует или выключен", i))
                     statuses[rule.id] = st
                     continue
                 }
@@ -194,7 +212,7 @@ public enum RoutePlanner {
             case .interfaceRouter(let i):
                 guard let s = interfaces.first(where: { $0.name == i }), s.isUp, !s.ipv4.isEmpty else {
                     st.state = .waiting
-                    st.messages.append("Interface \(i) is down or has no IPv4 address")
+                    st.messages.append(CoreL10n.tr("Interface %@ is down or has no IPv4 address", "Интерфейс %@ выключен или не имеет IPv4-адреса", i))
                     statuses[rule.id] = st
                     continue
                 }
@@ -203,7 +221,7 @@ public enum RoutePlanner {
                     gateway = r
                 } else if !s.isPointToPoint {
                     st.state = .waiting
-                    st.messages.append("No router known for \(i) yet (DHCP not finished?)")
+                    st.messages.append(CoreL10n.tr("No router known for %@ yet (DHCP not finished?)", "Роутер для %@ пока неизвестен (DHCP ещё не завершился?)", i))
                     statuses[rule.id] = st
                     continue
                 }
@@ -223,20 +241,20 @@ public enum RoutePlanner {
                         st.resolved[name] = sorted
                     } else if let cached = cache[name], !cached.isEmpty {
                         st.resolved[name] = cached
-                        st.messages.append("DNS lookup for \(name) failed; using last known IPs")
+                        st.messages.append(CoreL10n.tr("DNS lookup for %@ failed; using last known IPs", "Не удалось разрешить %@ через DNS; используются последние известные IP", name))
                     } else {
-                        st.messages.append("Could not resolve \(name)")
+                        st.messages.append(CoreL10n.tr("Could not resolve %@", "Не удалось разрешить %@", name))
                     }
                     targets = (st.resolved[name] ?? []).map { ($0, 32, name) }
                 }
                 for (address, prefix, domain) in targets {
                     let key = "\(address)/\(prefix)"
                     if address == gateway {
-                        st.messages.append("Skipped \(address): it is the gateway itself")
+                        st.messages.append(CoreL10n.tr("Skipped %@: it is the gateway itself", "Пропущен %@: это сам адрес шлюза", address))
                         continue
                     }
                     if let owner = seen[key] {
-                        if owner != rule.id { st.messages.append("\(key) is already routed by another rule; skipped") }
+                        if owner != rule.id { st.messages.append(CoreL10n.tr("%@ is already routed by another rule; skipped", "%@ уже маршрутизируется другим правилом; пропущен", key)) }
                         continue
                     }
                     seen[key] = rule.id

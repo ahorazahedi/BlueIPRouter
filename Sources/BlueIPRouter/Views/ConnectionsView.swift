@@ -37,41 +37,41 @@ struct ConnectionsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            PageHeader(title: "Connections", subtitle: "Which app is talking to which address, and through which interface — live") {
+            PageHeader(title: L10n.tr("Connections"), subtitle: L10n.tr("Which app is talking to which address, and through which interface — live")) {
                 HStack {
-                    if let updated { Text("Updated \(updated.formatted(date: .omitted, time: .standard))").font(.caption).foregroundStyle(.secondary) }
-                    Button { paused.toggle() } label: { Label(paused ? "Resume" : "Pause", systemImage: paused ? "play.fill" : "pause.fill") }
+                    if let updated { Text(L10n.tr("Updated %@", updated.formatted(date: .omitted, time: .standard))).font(.caption).foregroundStyle(.secondary) }
+                    Button { paused.toggle() } label: { Label(paused ? L10n.tr("Resume") : L10n.tr("Pause"), systemImage: paused ? "play.fill" : "pause.fill") }
                 }
             }
             summary
             HStack(spacing: 12) {
-                Picker("Interface", selection: $interfaceFilter) {
-                    Text("All interfaces").tag("all")
+                Picker(L10n.tr("Interface"), selection: $interfaceFilter) {
+                    Text(L10n.tr("All interfaces")).tag("all")
                     ForEach(Array(Set(connections.compactMap(\.interface))).sorted(), id: \.self) {
                         Text("\(model.displayName($0)) (\($0))").tag($0)
                     }
                 }
                 .frame(width: 280)
-                Toggle("Only traffic outside the VPN tunnel", isOn: $leaksOnly)
+                Toggle(L10n.tr("Only traffic outside the VPN tunnel"), isOn: $leaksOnly)
                     .disabled(tunnel == nil)
-                    .help(tunnel == nil ? "No full-tunnel VPN is up" : "Public destinations reached outside \(tunnel!) that no rule routes on purpose")
+                    .help(tunnel == nil ? L10n.tr("No full-tunnel VPN is up") : L10n.tr("Public destinations reached outside %@ that no rule routes on purpose", tunnel!))
                 Spacer()
-                Text("\(rows.count) connections").foregroundStyle(.secondary)
+                Text(L10n.tr("%lld connections", rows.count)).foregroundStyle(.secondary)
             }
             Table(rows, selection: $selection) {
-                TableColumn("App") { c in
+                TableColumn(L10n.tr("App")) { c in
                     HStack(spacing: 6) {
-                        if isLeak(c) { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).help("Outside the VPN tunnel") }
+                        if isLeak(c) { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).help(L10n.tr("Outside the VPN tunnel")) }
                         Text(c.process).fontWeight(.medium)
                         Text("\(c.pid)").font(.caption.monospaced()).foregroundStyle(.secondary)
                     }
                 }
                 .width(min: 150, ideal: 200)
-                TableColumn("Remote") { c in Text("\(c.remoteIP):\(c.remotePort)").font(.callout.monospaced()).textSelection(.enabled) }
+                TableColumn(L10n.tr("Remote")) { c in Text("\(c.remoteIP):\(c.remotePort)").font(.callout.monospaced()).textSelection(.enabled) }
                     .width(min: 160, ideal: 240)
-                TableColumn("Proto") { c in Text(c.proto) }.width(50)
-                TableColumn("State") { c in Text(c.state.isEmpty ? "—" : c.state).foregroundStyle(.secondary) }.width(min: 80, ideal: 100)
-                TableColumn("Interface") { c in
+                TableColumn(L10n.tr("Proto")) { c in Text(c.proto) }.width(50)
+                TableColumn(L10n.tr("State")) { c in Text(c.state.isEmpty ? "—" : c.state).foregroundStyle(.secondary) }.width(min: 80, ideal: 100)
+                TableColumn(L10n.tr("Interface")) { c in
                     if let i = c.interface {
                         Pill(text: "\(model.displayName(i)) (\(i))", color: i == tunnel ? .purple : (isLeak(c) ? .orange : .secondary))
                     } else {
@@ -79,28 +79,28 @@ struct ConnectionsView: View {
                     }
                 }
                 .width(min: 150, ideal: 200)
-                TableColumn("Local") { c in Text("\(c.localIP):\(c.localPort)").font(.caption.monospaced()).foregroundStyle(.secondary) }
+                TableColumn(L10n.tr("Local")) { c in Text("\(c.localIP):\(c.localPort)").font(.caption.monospaced()).foregroundStyle(.secondary) }
             }
             .contextMenu(forSelectionType: LiveConnection.ID.self) { ids in
                 if let id = ids.first, let c = connections.first(where: { $0.id == id }) {
-                    Button("Check Path to \(c.remoteIP)") { model.openPathCheck(c.remoteIP) }
+                    Button(L10n.tr("Check Path to %@", c.remoteIP)) { model.openPathCheck(c.remoteIP) }
                     if IPv4.isValid(c.remoteIP) {
-                        Button("Create Rule for \(c.remoteIP)…") { model.selection = .rules; model.newRule(destination: c.remoteIP) }
+                        Button(L10n.tr("Create Rule for %@…", c.remoteIP)) { model.selection = .rules; model.newRule(destination: c.remoteIP) }
                     }
-                    Button("Block \(c.remoteIP)…", role: .destructive) {
-                        Task { await model.blockAndApply(c.remoteIP, note: "Blocked from Connections (\(c.process))") }
+                    Button(L10n.tr("Block %@…", c.remoteIP), role: .destructive) {
+                        Task { await model.blockAndApply(c.remoteIP, note: L10n.tr("Blocked from Connections (%@)", c.process)) }
                     }
-                    Button("Copy Address") {
+                    Button(L10n.tr("Copy Address")) {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(c.remoteIP, forType: .string)
                     }
                 }
             }
-            Text("Shows your own apps' connections. Processes running as root (VPN cores, system daemons) are not listed.")
+            Text(L10n.tr("Shows your own apps' connections. Processes running as root (VPN cores, system daemons) are not listed."))
                 .font(.caption).foregroundStyle(.secondary)
         }
         .padding(24)
-        .searchable(text: $search, placement: .toolbar, prompt: "Filter by app, IP or port")
+        .searchable(text: $search, placement: .toolbar, prompt: Text(L10n.tr("Filter by app, IP or port")))
         .task {
             while !Task.isCancelled {
                 if !paused { await reload() }
@@ -121,13 +121,13 @@ struct ConnectionsView: View {
         return HStack(spacing: 12) {
             ForEach(byInterface.keys.sorted(), id: \.self) { key in
                 let list = byInterface[key] ?? []
-                StatChip(title: key == "?" ? "Unknown" : "\(model.displayName(key)) (\(key))",
-                         value: "\(list.count)", detail: "\(Set(list.map(\.process)).count) apps",
+                StatChip(title: key == "?" ? L10n.tr("Unknown") : "\(model.displayName(key)) (\(key))",
+                         value: "\(list.count)", detail: L10n.tr("%lld apps", Set(list.map(\.process)).count),
                          tint: key == tunnel ? .purple : .blue)
             }
             if tunnel != nil {
-                StatChip(title: "Outside the tunnel", value: "\(leaks.count)",
-                         detail: leaks.isEmpty ? "nothing leaking" : Set(leaks.map(\.process)).sorted().prefix(3).joined(separator: ", "),
+                StatChip(title: L10n.tr("Outside the tunnel"), value: "\(leaks.count)",
+                         detail: leaks.isEmpty ? L10n.tr("nothing leaking") : Set(leaks.map(\.process)).sorted().prefix(3).joined(separator: ", "),
                          tint: leaks.isEmpty ? .green : .orange)
             }
         }

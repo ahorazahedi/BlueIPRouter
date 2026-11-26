@@ -75,10 +75,10 @@ public struct KillSwitchConfig: Codable, Hashable, Sendable {
 
     public var validationErrors: [String] {
         var e: [String] = []
-        if interfaces.isEmpty { e.append("Choose at least one interface to guard") }
-        for i in interfaces where !Validation.isInterfaceName(i) { e.append("Invalid interface \(i)") }
-        for l in blockLists { for x in l.entries where KSEntry.parse(x) == nil { e.append("\(l.name): “\(x)” is not a CIDR, IP or domain") } }
-        for x in allow where KSEntry.parse(x) == nil { e.append("Allow list: “\(x)” is not a CIDR, IP or domain") }
+        if interfaces.isEmpty { e.append(CoreL10n.tr("Choose at least one interface to guard", "Выберите хотя бы один защищаемый интерфейс")) }
+        for i in interfaces where !Validation.isInterfaceName(i) { e.append(CoreL10n.tr("Invalid interface %@", "Неверный интерфейс %@", i)) }
+        for l in blockLists { for x in l.entries where KSEntry.parse(x) == nil { e.append(CoreL10n.tr("%@: “%@” is not a CIDR, IP or domain", "%@: «%@» не является CIDR, IP или доменом", l.name, x)) } }
+        for x in allow where KSEntry.parse(x) == nil { e.append(CoreL10n.tr("Allow list: “%@” is not a CIDR, IP or domain", "Список исключений: «%@» не является CIDR, IP или доменом", x)) }
         return e
     }
 }

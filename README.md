@@ -26,6 +26,7 @@ Built with SwiftUI. Requires macOS 14 or later.
 | **Notifications** | Public IP/country changes, VPN drops and reconnects, kill switch changes, failing rules, network changes and new versions |
 | **Updates** | Checks GitHub Releases once a day (or on demand) and offers the download |
 | **Setup Assistant** | A first-run checklist: install the background service, open at login, menu bar icon, import existing static routes, create the first rule |
+| **Interface language** | English and Russian. Switch in Settings; the choice is remembered and the default follows the system language |
 | **Backup & Restore** | Export and import JSON, automatic snapshots (after every Apply and before every restore or reset), and reset to default |
 
 ## Install

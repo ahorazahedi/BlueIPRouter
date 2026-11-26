@@ -9,24 +9,24 @@ struct AutomationView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                PageHeader(title: "Automation", subtitle: "React when a VPN connects or drops, or when you change networks") {
+                PageHeader(title: L10n.tr("Automation"), subtitle: L10n.tr("React when a VPN connects or drops, or when you change networks")) {
                     Button { editing = TriggerRule(name: "", event: .tunnelDown, actions: [], notify: true) } label: {
-                        Label("New Trigger", systemImage: "plus")
+                        Label(L10n.tr("New Trigger"), systemImage: "plus")
                     }
                     .buttonStyle(.borderedProminent)
                 }
                 PendingBanner()
                 if !model.backgroundServiceRunning {
-                    Banner(symbol: "exclamationmark.triangle", tint: .yellow, title: "Triggers need the background service",
-                           message: "The service watches the network and runs triggers, even when this app is closed.",
-                           actions: AnyView(Button("Turn On") { Task { await model.setService(enabled: true) } }))
+                    Banner(symbol: "exclamationmark.triangle", tint: .yellow, title: L10n.tr("Triggers need the background service"),
+                           message: L10n.tr("The service watches the network and runs triggers, even when this app is closed."),
+                           actions: AnyView(Button(L10n.tr("Turn On")) { Task { await model.setService(enabled: true) } }))
                 }
-                Card("Triggers", symbol: "bolt.badge.automatic") {
+                Card(L10n.tr("Triggers"), symbol: "bolt.badge.automatic") {
                     if model.workspace.automation.triggers.isEmpty {
-                        Text("No triggers yet. Examples: when the full-tunnel VPN disconnects, notify me; when it reconnects, re-learn its servers.")
+                        Text(L10n.tr("No triggers yet. Examples: when the full-tunnel VPN disconnects, notify me; when it reconnects, re-learn its servers."))
                             .foregroundStyle(.secondary)
                         HStack {
-                            Button("Add Suggested Triggers") { addSuggested() }
+                            Button(L10n.tr("Add Suggested Triggers")) { addSuggested() }
                         }
                     }
                     ForEach(model.workspace.automation.triggers) { t in
@@ -36,11 +36,11 @@ struct AutomationView: View {
                             })).toggleStyle(.switch).controlSize(.mini).labelsHidden()
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(t.name.isEmpty ? t.event.label : t.name).fontWeight(.medium)
-                                Text("When: \(t.event.label)").font(.caption).foregroundStyle(.secondary)
-                                Text("Then: " + actionSummary(t)).font(.caption).foregroundStyle(.secondary)
+                                Text(L10n.tr("When: %@", t.event.label)).font(.caption).foregroundStyle(.secondary)
+                                Text(L10n.tr("Then: %@", actionSummary(t))).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Button("Edit…") { editing = t }
+                            Button(L10n.tr("Edit…")) { editing = t }
                             Button(role: .destructive) { model.workspace.automation.triggers.removeAll { $0.id == t.id } } label: { Image(systemName: "trash") }
                                 .buttonStyle(.borderless)
                         }
@@ -57,22 +57,22 @@ struct AutomationView: View {
 
     private func actionSummary(_ t: TriggerRule) -> String {
         var parts = t.actions.map { model.describe($0) }
-        if t.notify { parts.append("notify") }
-        return parts.isEmpty ? "record only" : parts.joined(separator: ", ")
+        if t.notify { parts.append(L10n.tr("notify")) }
+        return parts.isEmpty ? L10n.tr("record only") : parts.joined(separator: ", ")
     }
 
     private func addSuggested() {
         model.workspace.automation.triggers += [
-            TriggerRule(name: "VPN dropped", event: .tunnelDown, actions: [], notify: true),
-            TriggerRule(name: "VPN reconnected", event: .tunnelUp, actions: [.learnVPNServers], notify: true),
-            TriggerRule(name: "New network", event: .networkChanged, actions: [], notify: true),
+            TriggerRule(name: L10n.tr("VPN dropped"), event: .tunnelDown, actions: [], notify: true),
+            TriggerRule(name: L10n.tr("VPN reconnected"), event: .tunnelUp, actions: [.learnVPNServers], notify: true),
+            TriggerRule(name: L10n.tr("New network"), event: .networkChanged, actions: [], notify: true),
         ]
     }
 
     private var eventsCard: some View {
-        Card("Recent events", symbol: "clock.arrow.circlepath") {
+        Card(L10n.tr("Recent events"), symbol: "clock.arrow.circlepath") {
             if model.net.events.isEmpty {
-                Text("No events yet. The background service records VPN and network changes here.").foregroundStyle(.secondary)
+                Text(L10n.tr("No events yet. The background service records VPN and network changes here.")).foregroundStyle(.secondary)
             }
             ForEach(model.net.events.suffix(40).reversed()) { e in
                 HStack(alignment: .firstTextBaseline) {
@@ -123,36 +123,36 @@ struct TriggerEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
-                Section("Trigger") {
-                    TextField("Name", text: $trigger.name, prompt: Text("e.g. VPN dropped"))
-                    Picker("When", selection: $eventKind) {
-                        Text("Full-tunnel VPN disconnects").tag("tunnelDown")
-                        Text("Full-tunnel VPN connects").tag("tunnelUp")
-                        Text("An interface goes down").tag("interfaceDown")
-                        Text("An interface comes up").tag("interfaceUp")
-                        Text("Internet traffic switches interface").tag("egressChanged")
-                        Text("Joined a different network").tag("networkChanged")
+                Section(L10n.tr("Trigger")) {
+                    TextField(L10n.tr("Name"), text: $trigger.name, prompt: Text(L10n.tr("e.g. VPN dropped")))
+                    Picker(L10n.tr("When"), selection: $eventKind) {
+                        Text(L10n.tr("Full-tunnel VPN disconnects")).tag("tunnelDown")
+                        Text(L10n.tr("Full-tunnel VPN connects")).tag("tunnelUp")
+                        Text(L10n.tr("An interface goes down")).tag("interfaceDown")
+                        Text(L10n.tr("An interface comes up")).tag("interfaceUp")
+                        Text(L10n.tr("Internet traffic switches interface")).tag("egressChanged")
+                        Text(L10n.tr("Joined a different network")).tag("networkChanged")
                     }
                     if eventKind == "interfaceUp" || eventKind == "interfaceDown" {
-                        Picker("Interface", selection: $interfaceName) {
-                            Text("Choose…").tag("")
+                        Picker(L10n.tr("Interface"), selection: $interfaceName) {
+                            Text(L10n.tr("Choose…")).tag("")
                             ForEach(interfaces, id: \.self) { Text("\(model.displayName($0)) (\($0))").tag($0) }
                         }
                     }
                 }
-                Section("Then") {
-                    Toggle("Send a notification", isOn: $trigger.notify)
-                    actionToggle(.learnVPNServers, "Re-learn VPN servers (for the kill switch)")
-                    actionToggle(.killSwitchOn, "Force the kill switch on")
-                    actionToggle(.killSwitchOff, "Force the kill switch off")
-                    actionToggle(.killSwitchAuto, "Return the kill switch to its setting")
-                    actionToggle(.clearProfile, "Clear the profile (all enabled rules)")
+                Section(L10n.tr("Then")) {
+                    Toggle(L10n.tr("Send a notification"), isOn: $trigger.notify)
+                    actionToggle(.learnVPNServers, L10n.tr("Re-learn VPN servers (for the kill switch)"))
+                    actionToggle(.killSwitchOn, L10n.tr("Force the kill switch on"))
+                    actionToggle(.killSwitchOff, L10n.tr("Force the kill switch off"))
+                    actionToggle(.killSwitchAuto, L10n.tr("Return the kill switch to its setting"))
+                    actionToggle(.clearProfile, L10n.tr("Clear the profile (all enabled rules)"))
                     ForEach(model.workspace.automation.profiles) { p in
-                        actionToggle(.activateProfile(p.id), "Switch to profile “\(p.name)”")
+                        actionToggle(.activateProfile(p.id), L10n.tr("Switch to profile “%@”", p.name))
                     }
                 }
                 Section {
-                    Text("Triggers run inside the background service within a few seconds of the change, even when this app is closed. Their effect lasts until another trigger changes it or the Mac restarts.")
+                    Text(L10n.tr("Triggers run inside the background service within a few seconds of the change, even when this app is closed. Their effect lasts until another trigger changes it or the Mac restarts."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -160,8 +160,8 @@ struct TriggerEditor: View {
             Divider()
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Save") {
+                Button(L10n.tr("Cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(L10n.tr("Save")) {
                     var t = trigger
                     t.event = event
                     if let i = model.workspace.automation.triggers.firstIndex(where: { $0.id == t.id }) {

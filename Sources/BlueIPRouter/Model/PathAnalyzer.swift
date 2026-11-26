@@ -38,6 +38,7 @@ struct PathHop: Identifiable, Hashable, Sendable {
     var explanation: [String]
     var ruleID: UUID?
     var tcp443: String?
+    var tcp443Reachable: Bool?
     var id: String { ip }
 }
 
@@ -55,7 +56,7 @@ struct PathCheckResult: Sendable {
 func interfaceDisplayName(_ name: String, info: InterfaceInfo?, aliases: [String: String]) -> String {
     if let alias = aliases[name], !alias.isEmpty { return alias }
     if let info {
-        if info.isFullTunnel { return "Full-tunnel VPN" }
+        if info.isFullTunnel { return L10n.tr("Full-tunnel VPN") }
         if let port = info.hardwarePort { return port }
         return info.kind.label
     }
@@ -85,12 +86,12 @@ enum PathAnalyzer {
             result.dnsMs = Date().timeIntervalSince(start) * 1000
             result.ipv6 = Resolver.resolve(query, family: AF_INET6, timeout: 3) ?? []
             if result.ipv4.isEmpty && result.ipv6.isEmpty {
-                result.error = "Could not resolve \(query). Check the name or your DNS."
+                result.error = L10n.tr("Could not resolve %@. Check the name or your DNS.", query)
                 return result
             }
-            if result.ipv4.isEmpty { result.error = "\(query) has no IPv4 address; only IPv6 paths exist." }
+            if result.ipv4.isEmpty { result.error = L10n.tr("%@ has no IPv4 address; only IPv6 paths exist.", query) }
         } else {
-            result.error = "Enter an IPv4 address (e.g. 203.0.113.10) or a domain (e.g. example.com)."
+            result.error = L10n.tr("Enter an IPv4 address (e.g. 203.0.113.10) or a domain (e.g. example.com).")
             return result
         }
         result.hops = result.ipv4.map { hop(for: $0, snapshot: snapshot, rules: rules, aliases: aliases) }
@@ -101,7 +102,7 @@ enum PathAnalyzer {
         let lookup = RouteQuery.lookup(ip)
         guard let lookup, let ifname = lookup.interface else {
             return PathHop(ip: ip, lookup: nil, interfaceName: nil, interfaceLabel: "—", verdict: .noRoute,
-                           headline: "No route to this address", explanation: ["The kernel has no route that covers \(ip)."])
+                           headline: L10n.tr("No route to this address"), explanation: [L10n.tr("The kernel has no route that covers %@.", ip)])
         }
         let info = snapshot.interfaces.first { $0.name == ifname }
         let label = interfaceDisplayName(ifname, info: info, aliases: aliases)
@@ -112,21 +113,21 @@ enum PathAnalyzer {
         switch kind {
         case .loopback:
             verdict = .local
-            headline = "Stays on this Mac (loopback)"
+            headline = L10n.tr("Stays on this Mac (loopback)")
         case .ppp, .ipsec:
             verdict = .vpn
-            headline = "Through \(label) (\(ifname))"
+            headline = L10n.tr("Through %@ (%@)", label, ifname)
         case .tunnel:
             verdict = .tunnel
-            headline = "Through tunnel \(label) (\(ifname))"
+            headline = L10n.tr("Through tunnel %@ (%@)", label, ifname)
         default:
             verdict = .direct
-            headline = "Direct via \(label) (\(ifname))"
+            headline = L10n.tr("Direct via %@ (%@)", label, ifname)
         }
-        if let g = lookup.gateway, IPv4.isValid(g) { headline += " → gateway \(g)" }
+        if let g = lookup.gateway, IPv4.isValid(g) { headline += " → \(L10n.tr("gateway")) \(g)" }
 
         var lines: [String] = []
-        lines.append("Matching route: \(lookup.matchedRouteLabel)\(lookup.isStatic ? " (static)" : "")")
+        lines.append(L10n.tr("Matching route: %@%@", lookup.matchedRouteLabel, lookup.isStatic ? L10n.tr(" (static)") : ""))
 
         let installed = snapshot.helperStatus?.installedRoutes ?? []
         let owner = installed.first { r in
@@ -135,16 +136,20 @@ enum PathAnalyzer {
         var ruleID: UUID?
         if let owner {
             ruleID = owner.ruleID
-            let name = rules.first { $0.id == owner.ruleID }?.name ?? "deleted rule"
-            lines.append("Installed by BlueIPRouter rule “\(name)”\(owner.sourceDomain.map { " for \($0)" } ?? "").")
+            let name = rules.first { $0.id == owner.ruleID }?.name ?? L10n.tr("deleted rule")
+            if let dom = owner.sourceDomain {
+                lines.append(L10n.tr("Installed by BlueIPRouter rule “%@” for %@.", name, dom))
+            } else {
+                lines.append(L10n.tr("Installed by BlueIPRouter rule “%@”.", name))
+            }
         } else if info?.isFullTunnel == true, lookup.flags.contains("WASCLONED") || (lookup.prefix.map { (1...8).contains($0) } ?? false) {
-            lines.append("This is a catch-all route of the tunnel \(ifname): everything without a more specific route goes into it.")
+            lines.append(L10n.tr("This is a catch-all route of the tunnel %@: everything without a more specific route goes into it.", ifname))
         } else if lookup.isDefault {
-            lines.append("Uses the default route of \(ifname).")
+            lines.append(L10n.tr("Uses the default route of %@.", ifname))
         } else if lookup.isHost && lookup.isStatic {
-            lines.append("Static host route added outside BlueIPRouter (by hand or another tool). Use Routing Table › Import to manage it.")
+            lines.append(L10n.tr("Static host route added outside BlueIPRouter (by hand or another tool). Use Routing Table › Import to manage it."))
         } else if let p = lookup.prefix, p >= 8, !lookup.flags.contains("GATEWAY") {
-            lines.append("The address is on a network directly attached to \(ifname).")
+            lines.append(L10n.tr("The address is on a network directly attached to %@.", ifname))
         }
         if let rule = rules.first(where: { r in r.enabled && r.parsedDestinations.contains { d in
             switch d {
@@ -153,24 +158,24 @@ enum PathAnalyzer {
             case .domain: return false
             }
         } }), owner == nil {
-            lines.append("Rule “\(rule.name)” covers this IP but its route is not active. Apply your changes or check the rule's status.")
+            lines.append(L10n.tr("Rule “%@” covers this IP but its route is not active. Apply your changes or check the rule's status.", rule.name))
         }
         if let bl = snapshot.helperStatus?.blockList, bl.blocks(ip) {
             verdict = .blocked
-            headline = "Blocked by your block list"
-            lines.insert("Connections to this address are refused on every interface, the VPN tunnel included.", at: 0)
+            headline = L10n.tr("Blocked by your block list")
+            lines.insert(L10n.tr("Connections to this address are refused on every interface, the VPN tunnel included."), at: 0)
         } else if let ks = snapshot.helperStatus?.killSwitch, ks.active {
             if ks.blocks(ip: ip, interface: ifname) {
                 verdict = .blocked
-                headline = "Blocked by the kill switch on \(label) (\(ifname))"
-                lines.insert("Packets to this address would leave through a guarded interface, so pf drops them.", at: 0)
+                headline = L10n.tr("Blocked by the kill switch on %@ (%@)", label, ifname)
+                lines.insert(L10n.tr("Packets to this address would leave through a guarded interface, so pf drops them."), at: 0)
             } else if verdict == .tunnel {
                 let leaks = ks.interfaces.filter { ks.blocks(ip: ip, interface: $0) }
-                if !leaks.isEmpty { lines.append("Kill switch: if the tunnel goes down, this traffic is blocked on \(leaks.joined(separator: ", ")) instead of leaking.") }
+                if !leaks.isEmpty { lines.append(L10n.tr("Kill switch: if the tunnel goes down, this traffic is blocked on %@ instead of leaking.", leaks.joined(separator: ", "))) }
             }
         }
         if verdict == .tunnel, info?.isFullTunnel == true {
-            lines.append("To bypass the tunnel, add a rule that sends this destination via your Wi-Fi router.")
+            lines.append(L10n.tr("To bypass the tunnel, add a rule that sends this destination via your Wi-Fi router."))
         }
         return PathHop(ip: ip, lookup: lookup, interfaceName: ifname, interfaceLabel: label, verdict: verdict,
                        headline: headline, explanation: lines, ruleID: ruleID)

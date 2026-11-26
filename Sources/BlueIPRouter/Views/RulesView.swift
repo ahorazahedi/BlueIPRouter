@@ -19,29 +19,29 @@ struct RulesView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            PageHeader(title: "Routing Rules", subtitle: "Send IPs, networks or domains out of the interface you choose") {
+            PageHeader(title: L10n.tr("Routing Rules"), subtitle: L10n.tr("Send IPs, networks or domains out of the interface you choose")) {
                 HStack {
-                    Button { model.showImport = true } label: { Label("Import Static Routes", systemImage: "square.and.arrow.down") }
-                        .help("Turn routes added by hand or by scripts into managed rules")
-                    Button { model.newRule() } label: { Label("New Rule", systemImage: "plus") }
+                    Button { model.showImport = true } label: { Label(L10n.tr("Import Static Routes"), systemImage: "square.and.arrow.down") }
+                        .help(L10n.tr("Turn routes added by hand or by scripts into managed rules"))
+                    Button { model.newRule() } label: { Label(L10n.tr("New Rule"), systemImage: "plus") }
                         .buttonStyle(.borderedProminent)
                 }
             }
             PendingBanner()
             if !model.net.service.daemonInstalled, model.workspace.rules.contains(where: \.persistent) {
-                Banner(symbol: "exclamationmark.triangle", tint: .yellow, title: "Persistent rules need the background service",
-                       message: "Without it, routes are not restored after a reboot or network change.",
-                       actions: AnyView(Button("Turn On") { Task { await model.setService(enabled: true) } }))
+                Banner(symbol: "exclamationmark.triangle", tint: .yellow, title: L10n.tr("Persistent rules need the background service"),
+                       message: L10n.tr("Without it, routes are not restored after a reboot or network change."),
+                       actions: AnyView(Button(L10n.tr("Turn On")) { Task { await model.setService(enabled: true) } }))
             }
 
             if model.workspace.rules.isEmpty {
                 ContentUnavailableView {
-                    Label("No routing rules", systemImage: "arrow.triangle.branch")
+                    Label(L10n.tr("No routing rules"), systemImage: "arrow.triangle.branch")
                 } description: {
-                    Text("Create a rule to send a domain or IP directly over Wi-Fi, through a VPN, or via a specific gateway.")
+                    Text(L10n.tr("Create a rule to send a domain or IP directly over Wi-Fi, through a VPN, or via a specific gateway."))
                 } actions: {
-                    Button("New Rule") { model.newRule() }.buttonStyle(.borderedProminent)
-                    Button("Import Existing Static Routes…") { model.showImport = true }
+                    Button(L10n.tr("New Rule")) { model.newRule() }.buttonStyle(.borderedProminent)
+                    Button(L10n.tr("Import Existing Static Routes…")) { model.showImport = true }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -49,55 +49,55 @@ struct RulesView: View {
             }
         }
         .padding(24)
-        .searchable(text: $search, placement: .toolbar, prompt: "Search rules")
-        .confirmationDialog("Delete \(selection.count) rule\(selection.count == 1 ? "" : "s")?", isPresented: $confirmDelete) {
-            Button("Delete", role: .destructive) { model.deleteRules(selection); selection = [] }
+        .searchable(text: $search, placement: .toolbar, prompt: L10n.tr("Search rules"))
+        .confirmationDialog(L10n.tr("Delete %@?", L10n.pluralRule(selection.count)), isPresented: $confirmDelete) {
+            Button(L10n.tr("Delete"), role: .destructive) { model.deleteRules(selection); selection = [] }
         } message: {
-            Text("Their routes are removed when you apply changes.")
+            Text(L10n.tr("Their routes are removed when you apply changes."))
         }
     }
 
     private var table: some View {
         Table(rules, selection: $selection) {
-            TableColumn("On") { rule in
+            TableColumn(L10n.tr("On")) { rule in
                 Toggle("", isOn: Binding(get: { rule.enabled }, set: { model.setEnabled(rule.id, $0) }))
                     .labelsHidden().toggleStyle(.switch).controlSize(.mini)
             }
             .width(44)
-            TableColumn("Name") { rule in
+            TableColumn(L10n.tr("Name")) { rule in
                 VStack(alignment: .leading, spacing: 2) {
                     Text(rule.name).fontWeight(.medium)
                     if !rule.notes.isEmpty { Text(rule.notes).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
                 }
             }
             .width(min: 140, ideal: 200)
-            TableColumn("Destinations") { rule in
+            TableColumn(L10n.tr("Destinations")) { rule in
                 Text(rule.destinations.joined(separator: ", ")).font(.callout.monospaced()).lineLimit(2)
                     .help(rule.destinations.joined(separator: "\n"))
             }
             .width(min: 160, ideal: 260)
-            TableColumn("Route via") { rule in
+            TableColumn(L10n.tr("Route via")) { rule in
                 Text(model.describe(rule.via)).lineLimit(1)
             }
             .width(min: 160, ideal: 230)
-            TableColumn("Persistence") { rule in
+            TableColumn(L10n.tr("Persistence")) { rule in
                 Toggle(isOn: Binding(get: { rule.persistent }, set: { model.setPersistent(rule.id, $0) })) {
-                    Text(rule.persistent ? "Persistent" : "Until reboot")
+                    Text(rule.persistent ? L10n.tr("Persistent") : L10n.tr("Until reboot"))
                 }
                 .toggleStyle(.checkbox)
-                .help(rule.persistent ? "Restored at boot by the background service" : "Removed at the next reboot")
+                .help(rule.persistent ? L10n.tr("Restored at boot by the background service") : L10n.tr("Removed at the next reboot"))
             }
             .width(min: 110, ideal: 120)
-            TableColumn("Status") { rule in
+            TableColumn(L10n.tr("Status")) { rule in
                 let st = model.status(for: rule)
                 let live = model.net.liveRoutes[rule.id]
                 ruleStateView(st, rule: rule, pending: pendingIDs.contains(rule.id), live: live)
                     .help(pendingIDs.contains(rule.id) && live?.allLive == true
-                          ? "All \(live!.expected) routes of this rule already exist on this Mac, but BlueIPRouter does not manage them yet. Apply to take them over and keep them after reboot."
+                          ? L10n.tr("All %lld routes of this rule already exist on this Mac, but BlueIPRouter does not manage them yet. Apply to take them over and keep them after reboot.", live!.expected)
                           : (st?.messages ?? []).joined(separator: "\n"))
             }
             .width(min: 110, ideal: 130)
-            TableColumn("Resolved / Routes") { rule in
+            TableColumn(L10n.tr("Resolved / Routes")) { rule in
                 let st = model.status(for: rule)
                 Text(resolvedSummary(st)).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(2)
                     .help(((st?.routes ?? []) + (st?.messages ?? [])).joined(separator: "\n"))
@@ -106,15 +106,15 @@ struct RulesView: View {
         }
         .contextMenu(forSelectionType: UUID.self) { ids in
             if ids.count == 1, let id = ids.first, let rule = model.workspace.rules.first(where: { $0.id == id }) {
-                Button("Edit…") { model.editingRule = rule }
-                Button("Duplicate") { model.duplicate(rule) }
-                Button(rule.enabled ? "Disable" : "Enable") { model.setEnabled(id, !rule.enabled) }
+                Button(L10n.tr("Edit…")) { model.editingRule = rule }
+                Button(L10n.tr("Duplicate")) { model.duplicate(rule) }
+                Button(rule.enabled ? L10n.tr("Disable") : L10n.tr("Enable")) { model.setEnabled(id, !rule.enabled) }
                 if let first = rule.destinations.first {
-                    Button("Check Path for \(first)") { model.openPathCheck(first) }
+                    Button(L10n.tr("Check Path for %@", first)) { model.openPathCheck(first) }
                 }
                 Divider()
             }
-            Button("Delete", role: .destructive) { selection = ids; confirmDelete = true }
+            Button(L10n.tr("Delete"), role: .destructive) { selection = ids; confirmDelete = true }
         } primaryAction: { ids in
             if let id = ids.first, let rule = model.workspace.rules.first(where: { $0.id == id }) { model.editingRule = rule }
         }
@@ -181,23 +181,23 @@ struct RuleEditor: View {
         VStack(spacing: 0) {
             HStack {
                 Image(systemName: "arrow.triangle.branch").font(.title2).foregroundStyle(.tint)
-                Text(isNew ? "New Routing Rule" : "Edit Routing Rule").font(.title2.weight(.semibold))
+                Text(isNew ? L10n.tr("New Routing Rule") : L10n.tr("Edit Routing Rule")).font(.title2.weight(.semibold))
                 Spacer()
             }
             .padding(20)
             Divider()
             Form {
-                Section("General") {
-                    TextField("Name", text: $rule.name, prompt: Text("e.g. Office servers direct"))
-                    Toggle("Enabled", isOn: $rule.enabled)
-                    Picker("Persistence", selection: $rule.persistent) {
-                        Text("Persistent — restored after reboot").tag(true)
-                        Text("Until reboot").tag(false)
+                Section(L10n.tr("General")) {
+                    TextField(L10n.tr("Name"), text: $rule.name, prompt: Text(L10n.tr("e.g. Office servers direct")))
+                    Toggle(L10n.tr("Enabled"), isOn: $rule.enabled)
+                    Picker(L10n.tr("Persistence"), selection: $rule.persistent) {
+                        Text(L10n.tr("Persistent — restored after reboot")).tag(true)
+                        Text(L10n.tr("Until reboot")).tag(false)
                     }
-                    TextField("Notes", text: $rule.notes, prompt: Text("Optional"))
-                    Toggle("Leave routes in place when this rule is removed",
+                    TextField(L10n.tr("Notes"), text: $rule.notes, prompt: Text(L10n.tr("Optional")))
+                    Toggle(L10n.tr("Leave routes in place when this rule is removed"),
                            isOn: Binding(get: { rule.keepRoutesOnRemove ?? false }, set: { rule.keepRoutesOnRemove = $0 ? true : nil }))
-                        .help("Use for routes another app also needs, like a VPN server's own route.")
+                        .help(L10n.tr("Use for routes another app also needs, like a VPN server's own route."))
                 }
                 Section {
                     TextEditor(text: $destinationsText)
@@ -205,28 +205,28 @@ struct RuleEditor: View {
                         .frame(minHeight: 90)
                     destinationChips
                 } header: {
-                    Text("Destinations")
+                    Text(L10n.tr("Destinations"))
                 } footer: {
-                    Text("One per line: an IPv4 address (203.0.113.10), a network (10.20.0.0/16) or a domain (example.com). Domains are resolved to their IPv4 addresses and re-checked by the background service.")
+                    Text(L10n.tr("One per line: an IPv4 address (203.0.113.10), a network (10.20.0.0/16) or a domain (example.com). Domains are resolved to their IPv4 addresses and re-checked by the background service."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                Section("Send traffic via") {
-                    Picker("Mode", selection: $mode) {
-                        Text("Interface's router").tag(0)
-                        Text("Directly on interface").tag(1)
-                        Text("Specific gateway").tag(2)
+                Section(L10n.tr("Send traffic via")) {
+                    Picker(L10n.tr("Mode"), selection: $mode) {
+                        Text(L10n.tr("Interface's router")).tag(0)
+                        Text(L10n.tr("Directly on interface")).tag(1)
+                        Text(L10n.tr("Specific gateway")).tag(2)
                     }
                     .pickerStyle(.segmented)
                     if mode < 2 {
-                        Picker("Interface", selection: $interfaceName) {
+                        Picker(L10n.tr("Interface"), selection: $interfaceName) {
                             ForEach(interfaceChoices) { i in
-                                Text("\(model.displayName(i.name)) — \(i.name)\(i.ipv4.map { " · \($0)" } ?? "")\(i.isActive ? "" : " (inactive)")")
+                                Text("\(model.displayName(i.name)) — \(i.name)\(i.ipv4.map { " · \($0)" } ?? "")\(i.isActive ? "" : L10n.tr(" (inactive)"))")
                                     .tag(i.name)
                             }
                         }
                         Text(modeHelp).font(.caption).foregroundStyle(.secondary)
                     } else {
-                        TextField("Gateway IP", text: $gateway, prompt: Text("192.168.1.1"))
+                        TextField(L10n.tr("Gateway IP"), text: $gateway, prompt: Text("192.168.1.1"))
                             .font(.body.monospaced())
                     }
                 }
@@ -235,11 +235,11 @@ struct RuleEditor: View {
                         ForEach(previewCommands, id: \.self) { Text($0).font(.caption.monospaced()).textSelection(.enabled) }
                     }
                     Button { Task { await resolvePreview() } } label: {
-                        if resolving { ProgressView().controlSize(.small) } else { Label("Resolve domains now", systemImage: "magnifyingglass") }
+                        if resolving { ProgressView().controlSize(.small) } else { Label(L10n.tr("Resolve domains now"), systemImage: "magnifyingglass") }
                     }
                     .disabled(!draft.parsedDestinations.contains { if case .domain = $0 { return true }; return false })
                 } header: {
-                    Text("What will run")
+                    Text(L10n.tr("What will run"))
                 }
                 if !draft.validationErrors.isEmpty {
                     Section {
@@ -251,14 +251,14 @@ struct RuleEditor: View {
             Divider()
             HStack {
                 if !isNew {
-                    Button("Delete", role: .destructive) { model.deleteRules([rule.id]); dismiss() }
+                    Button(L10n.tr("Delete"), role: .destructive) { model.deleteRules([rule.id]); dismiss() }
                 }
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Save") { model.upsert(draft); dismiss() }
+                Button(L10n.tr("Cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(L10n.tr("Save")) { model.upsert(draft); dismiss() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(!draft.validationErrors.isEmpty)
-                Button("Save & Apply") {
+                Button(L10n.tr("Save & Apply")) {
                     model.upsert(draft)
                     dismiss()
                     Task { await model.apply() }
@@ -274,11 +274,11 @@ struct RuleEditor: View {
     private var modeHelp: String {
         let info = model.interface(interfaceName)
         if mode == 0 {
-            if let r = info?.router { return "Uses \(interfaceName)'s current router (\(r)). If the router changes (e.g. another Wi-Fi network), routes follow it automatically." }
-            if info?.snapshot.isPointToPoint == true { return "\(interfaceName) is point-to-point, so traffic is sent directly on it." }
-            return "\(interfaceName) has no router right now; the rule waits until it gets one."
+            if let r = info?.router { return L10n.tr("Uses %@'s current router (%@). If the router changes (e.g. another Wi-Fi network), routes follow it automatically.", interfaceName, r) }
+            if info?.snapshot.isPointToPoint == true { return L10n.tr("%@ is point-to-point, so traffic is sent directly on it.", interfaceName) }
+            return L10n.tr("%@ has no router right now; the rule waits until it gets one.", interfaceName)
         }
-        return "Sends packets straight out of \(interfaceName) without a gateway. Use this for VPN/PPP/tunnel interfaces."
+        return L10n.tr("Sends packets straight out of %@ without a gateway. Use this for VPN/PPP/tunnel interfaces.", interfaceName)
     }
 
     private var destinationChips: some View {
@@ -288,7 +288,7 @@ struct RuleEditor: View {
                 if let d = Destination.parse(p) {
                     Pill(text: "\(d.kindLabel): \(d.display)", color: .accentColor)
                 } else {
-                    Pill(text: "Invalid: \(p)", color: .red, symbol: "exclamationmark.triangle")
+                    Pill(text: L10n.tr("Invalid: %@", p), color: .red, symbol: "exclamationmark.triangle")
                 }
             }
         }
@@ -301,7 +301,7 @@ struct RuleEditor: View {
         case .interfaceRouter(let i):
             if let router = model.interface(i)?.router { hop = router } else { hop = "-interface \(i)" }
         case .interfaceDirect(let i): hop = "-interface \(i)"
-        case .gateway(let g): hop = g.isEmpty ? "<gateway>" : g
+        case .gateway(let g): hop = g.isEmpty ? L10n.tr("<gateway>") : g
         }
         var lines: [String] = []
         for d in r.parsedDestinations {
@@ -312,11 +312,11 @@ struct RuleEditor: View {
                 if let ips = preview[name] {
                     lines += ips.map { "route -n add -host \($0) \(hop)    # \(name)" }
                 } else {
-                    lines.append("route -n add -host <each IPv4 of \(name)> \(hop)")
+                    lines.append(L10n.tr("route -n add -host <each IPv4 of %@> %@", name, hop))
                 }
             }
         }
-        return lines.isEmpty ? ["Add a destination to see the commands."] : lines
+        return lines.isEmpty ? [L10n.tr("Add a destination to see the commands.")] : lines
     }
 
     private func resolvePreview() async {
@@ -325,7 +325,7 @@ struct RuleEditor: View {
         let names: [String] = draft.parsedDestinations.compactMap { if case .domain(let n) = $0 { return n }; return nil }
         let result = await Task.detached { () -> [String: [String]] in
             var out: [String: [String]] = [:]
-            for n in names { out[n] = Resolver.resolve(n) ?? ["(no IPv4 address)"] }
+            for n in names { out[n] = Resolver.resolve(n) ?? [L10n.tr("(no IPv4 address)")] }
             return out
         }.value
         preview = result

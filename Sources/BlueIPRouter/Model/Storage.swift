@@ -125,7 +125,7 @@ enum Storage {
     static func readBackup(_ url: URL) throws -> BackupBundle {
         let bundle = try BIRJSON.decoder.decode(BackupBundle.self, from: Data(contentsOf: url))
         guard bundle.format == "BlueIPRouter.backup" else {
-            throw NSError(domain: "BlueIPRouter", code: 1, userInfo: [NSLocalizedDescriptionKey: "This file is not a BlueIPRouter backup."])
+            throw NSError(domain: "BlueIPRouter", code: 1, userInfo: [NSLocalizedDescriptionKey: L10n.tr("This file is not a BlueIPRouter backup.")])
         }
         return bundle
     }

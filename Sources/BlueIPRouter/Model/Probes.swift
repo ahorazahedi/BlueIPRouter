@@ -40,7 +40,7 @@ struct PublicIPResult: Identifiable, Hashable, Sendable {
 
     var ip: String? { v4?.ip ?? v6?.ip }
     var primary: IPIdentity? { v4 ?? v6 }
-    var error: String? { ip == nil ? (v4Error ?? v6Error ?? "Not available") : nil }
+    var error: String? { ip == nil ? (v4Error ?? v6Error ?? L10n.tr("Not available")) : nil }
 }
 
 private final class OneShot<T>: @unchecked Sendable {
@@ -141,14 +141,14 @@ enum Probes {
         let host = v6 ? "api6.ipify.org" : "api.ipify.org"
         let family = v6 ? AF_INET6 : AF_INET
         guard let target = Resolver.resolve(host, family: family, timeout: 4)?.first else {
-            return .failure(ProbeError.noAddress("No \(v6 ? "IPv6" : "IPv4") connectivity"))
+            return .failure(ProbeError.noAddress(L10n.tr(v6 ? "No IPv6 connectivity" : "No IPv4 connectivity")))
         }
         do {
             let (data, ms) = try await httpsGet(host: host, path: "/", connectTo: target, interface: interface, timeout: 6)
             let (status, body) = split(data)
             let ip = String(decoding: body, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
             guard status == 200, IPv4.isValid(ip) || Validation.isIPv6(ip) else {
-                return .failure(ProbeError.badResponse("\(host) answered HTTP \(status)"))
+                return .failure(ProbeError.badResponse(L10n.tr("%@ answered HTTP %lld", host, status)))
             }
             return .success((ip, ms))
         } catch {
@@ -173,7 +173,7 @@ enum Probes {
         func str(_ k: String) -> String? { (j[k] as? String).flatMap { $0.isEmpty ? nil : $0 } }
         switch provider {
         case .ipinfo:
-            if j["bogon"] as? Bool == true { return IPIdentity(ip: ip, org: "Private/reserved address") }
+            if j["bogon"] as? Bool == true { return IPIdentity(ip: ip, org: L10n.tr("Private/reserved address")) }
             return IPIdentity(ip: ip, city: str("city"), region: str("region"), country: str("country"),
                               org: str("org"), timezone: str("timezone"), coords: str("loc"))
         case .ipwhois:
@@ -190,13 +190,13 @@ enum Probes {
     }
 
     static func friendly(_ error: Error) -> String {
-        if (error as? URLError)?.code == .timedOut { return "No internet through this path (timed out)" }
+        if (error as? URLError)?.code == .timedOut { return L10n.tr("No internet through this path (timed out)") }
         if let nw = error as? NWError {
             switch nw {
-            case .posix(let code) where code == .ENETDOWN || code == .ENETUNREACH: return "No route to the internet from this interface"
-            case .posix(let code) where code == .ECONNREFUSED: return "Connection refused"
-            case .dns: return "DNS lookup failed"
-            case .tls: return "TLS handshake failed (traffic may be intercepted)"
+            case .posix(let code) where code == .ENETDOWN || code == .ENETUNREACH: return L10n.tr("No route to the internet from this interface")
+            case .posix(let code) where code == .ECONNREFUSED: return L10n.tr("Connection refused")
+            case .dns: return L10n.tr("DNS lookup failed")
+            case .tls: return L10n.tr("TLS handshake failed (traffic may be intercepted)")
             default: return "\(nw)"
             }
         }
@@ -216,7 +216,7 @@ enum Probes {
         }
         switch r6 {
         case .success(let (ip, ms)): result.v6 = IPIdentity(ip: ip); result.latencyMs = result.latencyMs ?? ms; ips.append(ip)
-        case .failure: result.v6Error = "No IPv6 connectivity on this path"
+        case .failure: result.v6Error = L10n.tr("No IPv6 connectivity on this path")
         }
         return (result, ips)
     }
@@ -280,7 +280,7 @@ final class TracerouteRunner {
             process = p
             running = true
         } catch {
-            lines.append("Could not start traceroute: \(error.localizedDescription)")
+            lines.append(L10n.tr("Could not start traceroute: %@", error.localizedDescription))
         }
     }
 

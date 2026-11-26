@@ -55,7 +55,7 @@ extension Probes {
     static func dnsLeakTest() async throws -> DNSLeakResult {
         let (idData, _) = try await httpsGet(host: "bash.ws", path: "/id", interface: nil)
         let id = String(decoding: split(idData).body, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !id.isEmpty, id.allSatisfy(\.isNumber) else { throw ProbeError.badResponse("Leak test service did not return an id") }
+        guard !id.isEmpty, id.allSatisfy(\.isNumber) else { throw ProbeError.badResponse(L10n.tr("Leak test service did not return an id")) }
         await withTaskGroup(of: Void.self) { group in
             for i in 1...10 {
                 group.addTask { _ = Resolver.resolve("\(i).\(id).bash.ws", timeout: 3) }
@@ -63,7 +63,7 @@ extension Probes {
         }
         let (data, _) = try await httpsGet(host: "bash.ws", path: "/dnsleak/test/\(id)?json", interface: nil, timeout: 12)
         guard let arr = try JSONSerialization.jsonObject(with: split(data).body) as? [[String: Any]] else {
-            throw ProbeError.badResponse("Unexpected leak test response")
+            throw ProbeError.badResponse(L10n.tr("Unexpected leak test response"))
         }
         var result = DNSLeakResult(yourIP: nil, servers: [], conclusion: nil)
         for o in arr {
@@ -91,8 +91,8 @@ struct DNSView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                PageHeader(title: "DNS", subtitle: "Which servers answer your lookups, whether they bypass the VPN, and per-domain resolvers") {
-                    Button { Task { await reload() } } label: { Label("Reload", systemImage: "arrow.clockwise") }
+                PageHeader(title: L10n.tr("DNS"), subtitle: L10n.tr("Which servers answer your lookups, whether they bypass the VPN, and per-domain resolvers")) {
+                    Button { Task { await reload() } } label: { Label(L10n.tr("Reload"), systemImage: "arrow.clockwise") }
                 }
                 PendingBanner()
                 leakCard
@@ -112,27 +112,27 @@ struct DNSView: View {
     private var tunnel: String? { model.fullTunnel?.name }
 
     private var leakCard: some View {
-        Card("DNS leak test", symbol: "drop.triangle",
+        Card(L10n.tr("DNS leak test"), symbol: "drop.triangle",
              trailing: AnyView(Button {
                  Task {
                      testing = true
                      leakError = nil
                      do { leak = try await Probes.dnsLeakTest() } catch { leakError = error.localizedDescription }
                      testing = false
-                     model.log("DNS leak test", ok: leakError == nil, leak?.servers.map { "\($0.ip) \($0.country ?? "")" }.joined(separator: "\n") ?? leakError ?? "")
+                     model.log(L10n.tr("DNS leak test"), ok: leakError == nil, leak?.servers.map { "\($0.ip) \($0.country ?? "")" }.joined(separator: "\n") ?? leakError ?? "")
                  }
              } label: {
-                 if testing { ProgressView().controlSize(.small) } else { Label("Run Test", systemImage: "play.fill") }
+                 if testing { ProgressView().controlSize(.small) } else { Label(L10n.tr("Run Test"), systemImage: "play.fill") }
              }.disabled(testing))) {
-            Text("Looks up random names and asks bash.ws which DNS servers fetched them. If those servers belong to your local ISP while you expect the VPN's, DNS is leaking. Uses bash.ws, a third-party service.")
+            Text(L10n.tr("Looks up random names and asks bash.ws which DNS servers fetched them. If those servers belong to your local ISP while you expect the VPN's, DNS is leaking. Uses bash.ws, a third-party service."))
                 .font(.callout).foregroundStyle(.secondary)
             if let e = leakError { Label(e, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
             if let leak {
                 if let ip = leak.yourIP {
-                    KeyValueRow(key: "Your IP", value: "\(ip.flag ?? "") \(ip.ip) · \(ip.country ?? "") \(ip.asn ?? "")", mono: false)
+                    KeyValueRow(key: L10n.tr("Your IP"), value: "\(ip.flag ?? "") \(ip.ip) · \(ip.country ?? "") \(ip.asn ?? "")", mono: false)
                 }
                 ForEach(leak.servers) { s in
-                    KeyValueRow(key: "DNS server", value: "\(s.flag ?? "") \(s.ip) · \(s.country ?? "") \(s.asn ?? "")", mono: false)
+                    KeyValueRow(key: L10n.tr("DNS server"), value: "\(s.flag ?? "") \(s.ip) · \(s.country ?? "") \(s.asn ?? "")", mono: false)
                 }
                 if let c = leak.conclusion {
                     let leaking = c.localizedCaseInsensitiveContains("leak") && !c.localizedCaseInsensitiveContains("not leak")
@@ -144,12 +144,12 @@ struct DNSView: View {
     }
 
     private var systemCard: some View {
-        Card("Resolvers macOS uses", symbol: "server.rack") {
-            if resolvers.isEmpty { Text("Loading…").foregroundStyle(.secondary) }
+        Card(L10n.tr("Resolvers macOS uses"), symbol: "server.rack") {
+            if resolvers.isEmpty { Text(L10n.tr("Loading…")).foregroundStyle(.secondary) }
             ForEach(resolvers) { r in
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text(r.domain.map { "For *.\($0)" } ?? "Default (all other names)").fontWeight(.medium)
+                        Text(r.domain.map { L10n.tr("For *.%@", $0) } ?? L10n.tr("Default (all other names)")).fontWeight(.medium)
                         if let i = r.interface { Pill(text: "\(model.displayName(i)) (\(i))", color: .secondary) }
                         Spacer()
                     }
@@ -157,9 +157,9 @@ struct DNSView: View {
                         HStack {
                             Text(ns).font(.callout.monospaced())
                             if let via = r.paths[ns] {
-                                Text("reached via \(model.displayName(via)) (\(via))").font(.caption).foregroundStyle(.secondary)
+                                Text(L10n.tr("reached via %@ (%@)", model.displayName(via), via)).font(.caption).foregroundStyle(.secondary)
                                 if let tunnel, via != tunnel, !(IPv4.isPrivate(ns) && r.domain != nil) {
-                                    Pill(text: "Outside the VPN tunnel", color: .orange, symbol: "exclamationmark.triangle")
+                                    Pill(text: L10n.tr("Outside the VPN tunnel"), color: .orange, symbol: "exclamationmark.triangle")
                                 }
                             }
                         }
@@ -167,15 +167,15 @@ struct DNSView: View {
                 }
                 Divider()
             }
-            Text("A resolver reached outside the tunnel sees which sites you look up. Fix it with a per-domain resolver below, DNS settings on the adapter, or the VPN's own DNS option.")
+            Text(L10n.tr("A resolver reached outside the tunnel sees which sites you look up. Fix it with a per-domain resolver below, DNS settings on the adapter, or the VPN's own DNS option."))
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
 
     private var perDomainCard: some View {
-        Card("Per-domain resolvers", symbol: "arrow.triangle.branch",
-             trailing: AnyView(Button { editing = DomainResolver(domain: "", nameservers: []) } label: { Label("Add", systemImage: "plus") })) {
-            Text("Send lookups for a domain and its subdomains to specific name servers (for example an internal domain to your company or university DNS). Written to /etc/resolver by the background service.")
+        Card(L10n.tr("Per-domain resolvers"), symbol: "arrow.triangle.branch",
+             trailing: AnyView(Button { editing = DomainResolver(domain: "", nameservers: []) } label: { Label(L10n.tr("Add"), systemImage: "plus") })) {
+            Text(L10n.tr("Send lookups for a domain and its subdomains to specific name servers (for example an internal domain to your company or university DNS). Written to /etc/resolver by the background service."))
                 .font(.callout).foregroundStyle(.secondary)
             ForEach(model.workspace.automation.resolvers) { r in
                 HStack {
@@ -185,8 +185,8 @@ struct DNSView: View {
                     Text("*.\(r.domain)").font(.body.monospaced())
                     Text("→ \(r.nameservers.joined(separator: ", "))").font(.callout.monospaced()).foregroundStyle(.secondary)
                     Spacer()
-                    if model.net.helperStatus?.resolvers?.active.contains(r.domain.lowercased()) == true { Pill(text: "Active", color: .green) }
-                    Button("Edit…") { editing = r }
+                    if model.net.helperStatus?.resolvers?.active.contains(r.domain.lowercased()) == true { Pill(text: L10n.tr("Active"), color: .green) }
+                    Button(L10n.tr("Edit…")) { editing = r }
                     Button(role: .destructive) { model.workspace.automation.resolvers.removeAll { $0.id == r.id } } label: { Image(systemName: "trash") }
                         .buttonStyle(.borderless)
                 }
@@ -195,7 +195,7 @@ struct DNSView: View {
             let foreign = model.net.resolverFiles.filter { !$0.managed }
             if !foreign.isEmpty {
                 Divider()
-                Text("Other files in /etc/resolver (not managed by BlueIPRouter)").font(.caption).foregroundStyle(.secondary)
+                Text(L10n.tr("Other files in /etc/resolver (not managed by BlueIPRouter)")).font(.caption).foregroundStyle(.secondary)
                 ForEach(foreign, id: \.domain) { f in
                     Text("*.\(f.domain) → \(f.nameservers.joined(separator: ", "))").font(.caption.monospaced()).foregroundStyle(.secondary)
                 }
@@ -224,19 +224,19 @@ struct ResolverEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Per-domain Resolver").font(.title2.weight(.semibold))
+            Text(L10n.tr("Per-domain Resolver")).font(.title2.weight(.semibold))
             Form {
-                TextField("Domain", text: $resolver.domain, prompt: Text("example.com"))
-                TextField("Name servers", text: $servers, prompt: Text("10.0.0.53 10.0.0.54"))
-                Toggle("Enabled", isOn: $resolver.enabled)
+                TextField(L10n.tr("Domain"), text: $resolver.domain, prompt: Text("example.com"))
+                TextField(L10n.tr("Name servers"), text: $servers, prompt: Text("10.0.0.53 10.0.0.54"))
+                Toggle(L10n.tr("Enabled"), isOn: $resolver.enabled)
             }
-            Text("Tip: if the name server is only reachable through a VPN, also add a routing rule that sends its IP through that VPN.")
+            Text(L10n.tr("Tip: if the name server is only reachable through a VPN, also add a routing rule that sends its IP through that VPN."))
                 .font(.caption).foregroundStyle(.secondary)
             if let e = draft.validationError { Label(e, systemImage: "exclamationmark.circle").foregroundStyle(.red) }
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Save") {
+                Button(L10n.tr("Cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(L10n.tr("Save")) {
                     if let i = model.workspace.automation.resolvers.firstIndex(where: { $0.id == resolver.id }) {
                         model.workspace.automation.resolvers[i] = draft
                     } else {

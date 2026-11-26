@@ -7,22 +7,22 @@ struct DashboardView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                PageHeader(title: "Dashboard", subtitle: "Where your traffic goes right now") {
-                    Button { model.selection = .pathCheck } label: { Label("Check a Path", systemImage: "magnifyingglass") }
+                PageHeader(title: L10n.tr("Dashboard"), subtitle: L10n.tr("Where your traffic goes right now")) {
+                    Button { model.selection = .pathCheck } label: { Label(L10n.tr("Check a Path"), systemImage: "magnifyingglass") }
                 }
 
                 if let u = model.availableUpdate {
-                    Banner(symbol: "arrow.down.circle", tint: .blue, title: "BlueIPRouter \(u.version) is available",
-                           message: "You have \(BIR.version). Download the new version and replace the app in Applications.",
+                    Banner(symbol: "arrow.down.circle", tint: .blue, title: L10n.tr("BlueIPRouter %@ is available", u.version),
+                           message: L10n.tr("You have %@. Download the new version and replace the app in Applications.", BIR.version),
                            actions: AnyView(HStack {
-                               Button("Release Notes") { NSWorkspace.shared.open(u.pageURL) }
-                               Button("Download") { NSWorkspace.shared.open(u.downloadURL ?? u.pageURL) }.buttonStyle(.borderedProminent)
+                               Button(L10n.tr("Release Notes")) { NSWorkspace.shared.open(u.pageURL) }
+                               Button(L10n.tr("Download")) { NSWorkspace.shared.open(u.downloadURL ?? u.pageURL) }.buttonStyle(.borderedProminent)
                            }))
                 }
                 if model.daemonOutdated {
-                    Banner(symbol: "arrow.triangle.2.circlepath", tint: .orange, title: "Background service needs an update",
-                           message: "The installed helper (\(model.net.service.helperVersion ?? "older")) is older than this app (\(BIR.version)). Update it once (administrator password).",
-                           actions: AnyView(Button("Update Service") { Task { await model.apply(title: "update the background service") } }.buttonStyle(.borderedProminent)))
+                    Banner(symbol: "arrow.triangle.2.circlepath", tint: .orange, title: L10n.tr("Background service needs an update"),
+                           message: L10n.tr("The installed helper (%@) is older than this app (%@). Update it once (administrator password).", model.net.service.helperVersion ?? L10n.tr("older"), BIR.version),
+                           actions: AnyView(Button(L10n.tr("Update Service")) { Task { await model.apply(title: L10n.tr("update the background service")) } }.buttonStyle(.borderedProminent)))
                 }
                 PendingBanner()
 
@@ -47,16 +47,16 @@ struct DashboardView: View {
     private var primary: InterfaceInfo? { model.localInterface }
 
     private var localTile: some View {
-        StatTile(title: "Local IP", value: primary?.ipv4 ?? "—",
-                 detail: primary.map { "\(model.displayName($0.name)) (\($0.name)) · router \($0.router ?? "—")" } ?? "No Wi-Fi or Ethernet connection",
+        StatTile(title: L10n.tr("Local IP"), value: primary?.ipv4 ?? "—",
+                 detail: primary.map { L10n.tr("%@ (%@) · router %@", model.displayName($0.name), $0.name, $0.router ?? "—") } ?? L10n.tr("No Wi-Fi or Ethernet connection"),
                  symbol: "laptopcomputer", tint: .blue)
     }
 
     private var publicTile: some View {
         let d = model.publicIPs.first { $0.id == "default" }
-        return StatTile(title: "Public IPv4", value: d?.v4?.ip ?? (model.publicIPLoading ? "Checking…" : "—"),
+        return StatTile(title: L10n.tr("Public IPv4"), value: d?.v4?.ip ?? (model.publicIPLoading ? L10n.tr("Checking…") : "—"),
                         detail: d?.v4.map { [$0.location, $0.org].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ") }
-                            ?? d?.v4Error ?? "Default path",
+                            ?? d?.v4Error ?? L10n.tr("Default path"),
                         symbol: "globe", tint: .teal,
                         badge: d?.v4?.flag, badgeHelp: d?.v4?.country)
     }
@@ -65,9 +65,9 @@ struct DashboardView: View {
         let route = model.net.internetRoute
         let iface = model.interface(route?.interface)
         let tint: Color = iface?.kind == .tunnel ? .purple : (iface?.kind.isVPN == true ? .blue : .green)
-        return StatTile(title: "Internet Egress",
-                        value: route?.interface.map { model.displayName($0) } ?? "No route",
-                        detail: route.map { "\($0.interface ?? "?") via \($0.gateway ?? "—") · route \($0.matchedRouteLabel)" } ?? "",
+        return StatTile(title: L10n.tr("Internet Egress"),
+                        value: route?.interface.map { model.displayName($0) } ?? L10n.tr("No route"),
+                        detail: route.map { L10n.tr("%@ via %@ · route %@", $0.interface ?? "?", $0.gateway ?? "—", $0.matchedRouteLabel) } ?? "",
                         symbol: iface?.kind.symbol ?? "arrow.up.right", tint: tint)
     }
 
@@ -76,21 +76,21 @@ struct DashboardView: View {
         let active = statuses.filter { $0.state == .applied }.count
         let problems = statuses.filter { $0.state == .failed || $0.state == .partial || $0.state == .waiting }.count
         let liveOnly = model.liveButUnmanaged.count
-        return StatTile(title: "Routing Rules", value: "\(active) / \(model.workspace.rules.count) managed\(liveOnly > 0 ? " · \(liveOnly) live" : "")",
-                        detail: "\(model.net.helperStatus?.installedRoutes.count ?? 0) managed routes · \(problems) need attention · \(model.pendingChanges.count) unapplied",
+        return StatTile(title: L10n.tr("Routing Rules"), value: L10n.tr("%lld / %lld managed", active, model.workspace.rules.count) + (liveOnly > 0 ? L10n.tr(" · %lld live", liveOnly) : ""),
+                        detail: L10n.tr("%lld managed routes · %lld need attention · %lld unapplied", model.net.helperStatus?.installedRoutes.count ?? 0, problems, model.pendingChanges.count),
                         symbol: "arrow.triangle.branch", tint: problems > 0 ? .orange : .indigo)
     }
 
     private var publicByPath: some View {
-        Card("Public IP by path", symbol: "globe.europe.africa",
+        Card(L10n.tr("Public IP by path"), symbol: "globe.europe.africa",
              trailing: AnyView(HStack {
                  if let t = model.publicIPUpdated { Text(t.formatted(date: .omitted, time: .shortened)).font(.caption).foregroundStyle(.secondary) }
                  Button { Task { await model.refreshPublicIPs() } } label: {
                      if model.publicIPLoading { ProgressView().controlSize(.small) } else { Image(systemName: "arrow.clockwise") }
-                 }.buttonStyle(.borderless).help("Check the public address each path exits with")
+                 }.buttonStyle(.borderless).help(L10n.tr("Check the public address each path exits with"))
              })) {
             if model.publicIPs.isEmpty {
-                Text(model.publicIPLoading ? "Checking…" : "Not checked yet").foregroundStyle(.secondary)
+                Text(model.publicIPLoading ? L10n.tr("Checking…") : L10n.tr("Not checked yet")).foregroundStyle(.secondary)
             }
             ForEach(model.publicIPs) { r in
                 HStack(alignment: .firstTextBaseline) {
@@ -104,10 +104,10 @@ struct DashboardView: View {
                         }
                     }
                     Spacer()
-                    if let ms = r.latencyMs { Text(String(format: "%.0f ms", ms)).font(.caption).foregroundStyle(.secondary) }
+                    if let ms = r.latencyMs { Text(L10n.tr("%.0f ms", ms)).font(.caption).foregroundStyle(.secondary) }
                     if let flag = r.primary?.flag { Text(flag).help(r.primary?.country ?? "") }
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(r.v4?.ip ?? (r.error == nil ? "no IPv4" : "—")).font(.body.monospaced()).textSelection(.enabled)
+                        Text(r.v4?.ip ?? (r.error == nil ? L10n.tr("no IPv4") : "—")).font(.body.monospaced()).textSelection(.enabled)
                         if let v6 = r.v6?.ip { Text(v6).font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled) }
                     }
                 }
@@ -117,12 +117,12 @@ struct DashboardView: View {
     }
 
     private var managedRoutes: some View {
-        Card("Managed routes", symbol: "point.3.filled.connected.trianglepath.dotted") {
+        Card(L10n.tr("Managed routes"), symbol: "point.3.filled.connected.trianglepath.dotted") {
             let routes = model.net.helperStatus?.installedRoutes ?? []
             if routes.isEmpty {
-                Text(model.workspace.rules.isEmpty ? "No rules yet. Add one in Routing Rules." : "No routes installed yet.")
+                Text(model.workspace.rules.isEmpty ? L10n.tr("No rules yet. Add one in Routing Rules.") : L10n.tr("No routes installed yet."))
                     .foregroundStyle(.secondary)
-                Button("New Rule") { model.selection = .rules; model.newRule() }
+                Button(L10n.tr("New Rule")) { model.selection = .rules; model.newRule() }
             }
             ForEach(routes.prefix(12)) { r in
                 HStack {
@@ -132,21 +132,21 @@ struct DashboardView: View {
                     Spacer()
                     Text(r.nextHopLabel).font(.callout.monospaced()).foregroundStyle(.secondary)
                 }
-                .contextMenu { Button("Check Path") { model.openPathCheck(r.destination) } }
+                .contextMenu { Button(L10n.tr("Check Path")) { model.openPathCheck(r.destination) } }
             }
             if routes.count > 12 {
-                Button("Show all \(routes.count)…") { model.selection = .routes }.buttonStyle(.link)
+                Button(L10n.tr("Show all %lld…", routes.count)) { model.selection = .routes }.buttonStyle(.link)
             }
         }
     }
 
     private var interfacesCard: some View {
-        Card("Active interfaces", symbol: "network",
-             trailing: AnyView(Button("Manage") { model.selection = .adapters }.buttonStyle(.link))) {
+        Card(L10n.tr("Active interfaces"), symbol: "network",
+             trailing: AnyView(Button(L10n.tr("Manage")) { model.selection = .adapters }.buttonStyle(.link))) {
             let list = model.net.interfaces.filter { $0.isActive && !$0.snapshot.ipv4.isEmpty && !$0.snapshot.isLoopback }
             Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 10) {
                 GridRow {
-                    Text("Interface"); Text("Type"); Text("IPv4"); Text("Router / Peer"); Text("Down"); Text("Up")
+                    Text(L10n.tr("Interface")); Text(L10n.tr("Type")); Text("IPv4"); Text(L10n.tr("Router / Peer")); Text(L10n.tr("Down")); Text(L10n.tr("Up"))
                 }
                 .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 ForEach(list) { i in
@@ -155,10 +155,10 @@ struct DashboardView: View {
                             Image(systemName: i.kind.symbol).foregroundStyle(.secondary).frame(width: 18)
                             Text(model.displayName(i.name)).fontWeight(.medium)
                             Text(i.name).font(.caption.monospaced()).foregroundStyle(.secondary)
-                            if i.name == model.net.internetRoute?.interface { Pill(text: "Internet", color: .purple) }
-                            if i.name == model.net.primaryInterface { Pill(text: "Primary", color: .blue) }
+                            if i.name == model.net.internetRoute?.interface { Pill(text: L10n.tr("Internet"), color: .purple) }
+                            if i.name == model.net.primaryInterface { Pill(text: L10n.tr("Primary"), color: .blue) }
                         }
-                        Text(i.isFullTunnel ? "Full tunnel" : i.kind.label).foregroundStyle(.secondary)
+                        Text(i.isFullTunnel ? L10n.tr("Full tunnel") : i.kind.label).foregroundStyle(.secondary)
                         Text(i.ipv4 ?? "—").font(.body.monospaced()).textSelection(.enabled)
                         Text(i.router ?? i.snapshot.ipv4.first?.peer ?? "—").font(.body.monospaced())
                         Text(formatRate(model.rates[i.name]?.rx)).monospacedDigit()
@@ -177,11 +177,11 @@ struct PublicIdentityCard: View {
 
     var body: some View {
         let d = model.publicIPs.first { $0.id == "default" }
-        Card("My public IP", symbol: "person.badge.shield.checkmark",
+        Card(L10n.tr("My public IP"), symbol: "person.badge.shield.checkmark",
              trailing: AnyView(HStack(spacing: 8) {
-                 if let t = model.publicIPUpdated { Text("Checked \(t.formatted(date: .omitted, time: .shortened))").font(.caption).foregroundStyle(.secondary) }
+                 if let t = model.publicIPUpdated { Text(L10n.tr("Checked %@", t.formatted(date: .omitted, time: .shortened))).font(.caption).foregroundStyle(.secondary) }
                  Button { Task { await model.refreshPublicIPs() } } label: {
-                     if model.publicIPLoading { ProgressView().controlSize(.small) } else { Label("Refresh", systemImage: "arrow.clockwise") }
+                     if model.publicIPLoading { ProgressView().controlSize(.small) } else { Label(L10n.tr("Refresh"), systemImage: "arrow.clockwise") }
                  }
                  .disabled(model.publicIPLoading)
              })) {
@@ -191,7 +191,7 @@ struct PublicIdentityCard: View {
                 column("IPv6", d?.v6, error: d?.v6Error)
             }
             if let egress = model.net.internetRoute?.interface {
-                Text("As seen through the system default path: \(model.displayName(egress)) (\(egress)).")
+                Text(L10n.tr("As seen through the system default path: %@ (%@).", model.displayName(egress), egress))
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -209,16 +209,16 @@ struct PublicIdentityCard: View {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(id.ip, forType: .string)
                     } label: { Image(systemName: "doc.on.doc") }
-                        .buttonStyle(.borderless).help("Copy")
+                        .buttonStyle(.borderless).help(L10n.tr("Copy"))
                 } else {
-                    Text(model.publicIPLoading ? "Checking…" : "not available").font(.title3).foregroundStyle(.secondary)
+                    Text(model.publicIPLoading ? L10n.tr("Checking…") : L10n.tr("not available")).font(.title3).foregroundStyle(.secondary)
                 }
             }
             if let id {
-                KeyValueRow(key: "Location", value: id.location, mono: false)
-                KeyValueRow(key: "ISP/Org", value: id.org ?? "", mono: false)
-                KeyValueRow(key: "Timezone", value: id.timezone ?? "", mono: false)
-                KeyValueRow(key: "Coords", value: id.coords ?? "")
+                KeyValueRow(key: L10n.tr("Location"), value: id.location, mono: false)
+                KeyValueRow(key: L10n.tr("ISP/Org"), value: id.org ?? "", mono: false)
+                KeyValueRow(key: L10n.tr("Timezone"), value: id.timezone ?? "", mono: false)
+                KeyValueRow(key: L10n.tr("Coords"), value: id.coords ?? "")
             } else if let error, !model.publicIPLoading {
                 Text(error).font(.caption).foregroundStyle(.secondary)
             }
