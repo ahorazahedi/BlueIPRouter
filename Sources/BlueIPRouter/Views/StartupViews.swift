@@ -9,26 +9,26 @@ struct StartupCard: View {
     @AppStorage(MenuBarLabelStyle.key) private var labelStyle = MenuBarLabelStyle.icon.rawValue
 
     var body: some View {
-        Card("Startup", symbol: "power", trailing: AnyView(Button("Setup Assistant…") { model.showSetup = true })) {
-            StartupRow(symbol: "gearshape.2", title: "Routes and kill switch at boot",
-                       detail: "The background service runs as root from boot, even when the app is closed or nobody is logged in.",
+        Card(L10n.tr("Startup"), symbol: "power", trailing: AnyView(Button(L10n.tr("Setup Assistant…")) { model.showSetup = true })) {
+            StartupRow(symbol: "gearshape.2", title: L10n.tr("Routes and kill switch at boot"),
+                       detail: L10n.tr("The background service runs as root from boot, even when the app is closed or nobody is logged in."),
                        isOn: model.backgroundServiceRunning) { on in Task { await model.setService(enabled: on) } }
             Divider()
-            StartupRow(symbol: "person.crop.circle.badge.checkmark", title: "Open BlueIPRouter at login",
+            StartupRow(symbol: "person.crop.circle.badge.checkmark", title: L10n.tr("Open BlueIPRouter at login"),
                        detail: model.loginItemNeedsApproval
-                           ? "Waiting for your approval in System Settings › General › Login Items."
-                           : "Starts the app when you log in, so the dashboard and menu bar icon are ready.",
+                           ? L10n.tr("Waiting for your approval in System Settings › General › Login Items.")
+                           : L10n.tr("Starts the app when you log in, so the dashboard and menu bar icon are ready."),
                        isOn: model.openAtLogin) { on in model.setOpenAtLogin(on) }
             Divider()
-            StartupRow(symbol: "menubar.rectangle", title: "Menu bar icon",
-                       detail: "Shows status, public IP and quick actions in the menu bar, and keeps the app running when its window is closed.",
+            StartupRow(symbol: "menubar.rectangle", title: L10n.tr("Menu bar icon"),
+                       detail: L10n.tr("Shows status, public IP and quick actions in the menu bar, and keeps the app running when its window is closed."),
                        isOn: menuBarEnabled) { on in menuBarEnabled = on }
             if menuBarEnabled {
-                Picker("Show in the menu bar", selection: $labelStyle) {
+                Picker(L10n.tr("Show in the menu bar"), selection: $labelStyle) {
                     ForEach(MenuBarLabelStyle.allCases) { Text($0.title).tag($0.rawValue) }
                 }
                 .padding(.leading, 40)
-                Text("Can't see it? On Macs with a notch, macOS hides menu bar icons that don't fit. Hold ⌘ and drag other icons out of the menu bar, or use a narrower style.")
+                Text(L10n.tr("Can't see it? On Macs with a notch, macOS hides menu bar icons that don't fit. Hold ⌘ and drag other icons out of the menu bar, or use a narrower style."))
                     .font(.caption).foregroundStyle(.secondary).padding(.leading, 40)
             }
         }
@@ -67,40 +67,40 @@ struct SetupAssistant: View {
             HStack(spacing: 14) {
                 Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 56, height: 56)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Welcome to BlueIPRouter").font(.title.weight(.semibold))
-                    Text("Set up how routing starts. Everything here can be changed later in Persistence.")
+                    Text(L10n.tr("Welcome to BlueIPRouter")).font(.title.weight(.semibold))
+                    Text(L10n.tr("Set up how routing starts. Everything here can be changed later in Persistence."))
                         .foregroundStyle(.secondary)
                 }
             }
             VStack(spacing: 14) {
                 step(done: model.backgroundServiceRunning, symbol: "gearshape.2",
-                     title: "Install the background service",
-                     detail: "Applies your rules and kill switch at boot and keeps repairing them. Asks for your administrator password once.") {
-                    Button(model.backgroundServiceRunning ? "Installed" : "Install…") { Task { await model.setService(enabled: true) } }
+                     title: L10n.tr("Install the background service"),
+                     detail: L10n.tr("Applies your rules and kill switch at boot and keeps repairing them. Asks for your administrator password once.")) {
+                    Button(model.backgroundServiceRunning ? L10n.tr("Installed") : L10n.tr("Install…")) { Task { await model.setService(enabled: true) } }
                         .disabled(model.backgroundServiceRunning)
                 }
                 step(done: model.openAtLogin, symbol: "person.crop.circle.badge.checkmark",
-                     title: "Open the app at login", detail: "Optional. Routing works without the app running.") {
+                     title: L10n.tr("Open the app at login"), detail: L10n.tr("Optional. Routing works without the app running.")) {
                     Toggle("", isOn: Binding(get: { model.openAtLogin }, set: { model.setOpenAtLogin($0) })).toggleStyle(.switch).labelsHidden()
                 }
                 step(done: menuBarEnabled, symbol: "menubar.rectangle",
-                     title: "Show the menu bar icon", detail: "Status and quick actions; the app keeps running when the window is closed.") {
+                     title: L10n.tr("Show the menu bar icon"), detail: L10n.tr("Status and quick actions; the app keeps running when the window is closed.")) {
                     Toggle("", isOn: $menuBarEnabled).toggleStyle(.switch).labelsHidden()
                 }
                 step(done: imports == 0, symbol: "square.and.arrow.down",
-                     title: imports == 0 ? "No unmanaged static routes found" : "Import \(imports) existing static route\(imports == 1 ? "" : "s")",
-                     detail: "Routes added by hand or by scripts can become rules, so they survive reboots.") {
-                    if imports > 0 { Button("Review…") { model.showImport = true; dismiss() } }
+                     title: imports == 0 ? L10n.tr("No unmanaged static routes found") : L10n.tr("Import %@", L10n.pluralRoute(imports)),
+                     detail: L10n.tr("Routes added by hand or by scripts can become rules, so they survive reboots.")) {
+                    if imports > 0 { Button(L10n.tr("Review…")) { model.showImport = true; dismiss() } }
                 }
                 step(done: !model.workspace.rules.isEmpty, symbol: "arrow.triangle.branch",
-                     title: "Create your first rule", detail: "Send a domain or IP through the interface you choose.") {
-                    Button("New Rule…") { dismiss(); model.selection = .rules; model.newRule() }
+                     title: L10n.tr("Create your first rule"), detail: L10n.tr("Send a domain or IP through the interface you choose.")) {
+                    Button(L10n.tr("New Rule…")) { dismiss(); model.selection = .rules; model.newRule() }
                 }
             }
             HStack {
-                Text("You can reopen this from Help › Setup Assistant.").font(.caption).foregroundStyle(.secondary)
+                Text(L10n.tr("You can reopen this from Help › Setup Assistant.")).font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button("Done") {
+                Button(L10n.tr("Done")) {
                     model.workspace.setupCompleted = true
                     dismiss()
                 }
@@ -134,10 +134,10 @@ enum MenuBarLabelStyle: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .icon: return "Icon"
-        case .flag: return "Country flag"
-        case .flagAndIP: return "Flag and public IP"
-        case .speed: return "Download / upload speed"
+        case .icon: return L10n.tr("Icon")
+        case .flag: return L10n.tr("Country flag")
+        case .flagAndIP: return L10n.tr("Flag and public IP")
+        case .speed: return L10n.tr("Download / upload speed")
         }
     }
     static let key = "menuBarLabelStyle"
@@ -178,7 +178,7 @@ struct MenuBarView: View {
             HStack {
                 Text("BlueIPRouter").font(.headline)
                 Spacer()
-                Pill(text: model.backgroundServiceRunning ? "Service on" : "Service off",
+                Pill(text: model.backgroundServiceRunning ? L10n.tr("Service on") : L10n.tr("Service off"),
                      color: model.backgroundServiceRunning ? .green : .secondary)
             }
 
@@ -187,13 +187,13 @@ struct MenuBarView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     if let flag = d?.v4?.flag { Text(flag).font(.system(size: 28)) }
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Public IPv4").font(.caption).foregroundStyle(.secondary)
-                        Text(d?.v4?.ip ?? (model.publicIPLoading ? "Checking…" : "—"))
+                        Text(L10n.tr("Public IPv4")).font(.caption).foregroundStyle(.secondary)
+                        Text(d?.v4?.ip ?? (model.publicIPLoading ? L10n.tr("Checking…") : "—"))
                             .font(.title2.monospaced().weight(.semibold)).textSelection(.enabled)
                     }
                     Spacer()
                     if let ip = d?.v4?.ip {
-                        Button { copy(ip) } label: { Image(systemName: "doc.on.doc") }.buttonStyle(.borderless).help("Copy")
+                        Button { copy(ip) } label: { Image(systemName: "doc.on.doc") }.buttonStyle(.borderless).help(L10n.tr("Copy"))
                     }
                 }
                 if let v4 = d?.v4 {
@@ -201,7 +201,7 @@ struct MenuBarView: View {
                     detail("building.2", v4.org ?? "")
                     detail("clock", v4.timezone ?? "")
                 }
-                detail("6.circle", d?.v6.map { "IPv6 \($0.ip)" } ?? "IPv6 not available")
+                detail("6.circle", d?.v6.map { L10n.tr("IPv6 %@", $0.ip) } ?? L10n.tr("IPv6 not available"))
             }
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.05)))
@@ -209,48 +209,48 @@ struct MenuBarView: View {
             speedSection
 
             VStack(alignment: .leading, spacing: 6) {
-                row("arrow.up.right", "Internet via", egress.map { "\(model.displayName($0)) (\($0))" } ?? "—")
+                row("arrow.up.right", L10n.tr("Internet via"), egress.map { "\(model.displayName($0)) (\($0))" } ?? "—")
                 if let lan = model.localInterface {
-                    row("laptopcomputer", "Local IP", "\(lan.ipv4 ?? "—") · \(lan.name)")
+                    row("laptopcomputer", L10n.tr("Local IP"), "\(lan.ipv4 ?? "—") · \(lan.name)")
                     if let wifi = model.publicIPs.first(where: { $0.id == lan.name })?.v4 {
-                        row("wifi", "Direct public IP", "\(wifi.flag ?? "") \(wifi.ip)")
+                        row("wifi", L10n.tr("Direct public IP"), "\(wifi.flag ?? "") \(wifi.ip)")
                     }
                 }
-                row("square.stack.3d.up", "Profile", model.net.helperStatus?.profile?.name ?? "None")
-                row("arrow.triangle.branch", "Managed routes", "\(model.net.helperStatus?.installedRoutes.count ?? 0)")
-                row("hand.raised", "Kill switch", ks?.active == true ? "Armed" : "Off")
+                row("square.stack.3d.up", L10n.tr("Profile"), model.net.helperStatus?.profile?.name ?? L10n.tr("None"))
+                row("arrow.triangle.branch", L10n.tr("Managed routes"), "\(model.net.helperStatus?.installedRoutes.count ?? 0)")
+                row("hand.raised", L10n.tr("Kill switch"), ks?.active == true ? L10n.tr("Armed") : L10n.tr("Off"))
                 let failing = model.net.helperStatus?.rules.filter { $0.state == .failed || $0.state == .partial }.count ?? 0
-                if failing > 0 { row("exclamationmark.triangle", "Rules with problems", "\(failing)") }
+                if failing > 0 { row("exclamationmark.triangle", L10n.tr("Rules with problems"), "\(failing)") }
             }
 
             if model.hasPending {
-                Button("Apply \(model.pendingCount) Change\(model.pendingCount == 1 ? "" : "s")") { Task { await model.apply() } }
+                Button(L10n.tr("Apply (%@)", L10n.pluralChange(model.pendingCount))) { Task { await model.apply() } }
                     .buttonStyle(.borderedProminent).frame(maxWidth: .infinity)
             }
             if let u = model.availableUpdate {
-                Button("Download version \(u.version)") { NSWorkspace.shared.open(u.downloadURL ?? u.pageURL) }
+                Button(L10n.tr("Download version %@", u.version)) { NSWorkspace.shared.open(u.downloadURL ?? u.pageURL) }
                     .frame(maxWidth: .infinity)
             }
 
             Divider()
             HStack(spacing: 8) {
-                Button("Open BlueIPRouter") { open(nil) }
-                Button("Check a Path…") { open(.pathCheck) }
-                Button { open(.speedTest) } label: { Image(systemName: "speedometer") }.help("Run a speed test")
+                Button(L10n.tr("Open BlueIPRouter")) { open(nil) }
+                Button(L10n.tr("Check a Path…")) { open(.pathCheck) }
+                Button { open(.speedTest) } label: { Image(systemName: "speedometer") }.help(L10n.tr("Run a speed test"))
                 Spacer()
                 Button { Task { await model.refresh(); await model.refreshPublicIPs() } } label: {
                     if model.publicIPLoading { ProgressView().controlSize(.small) } else { Image(systemName: "arrow.clockwise") }
                 }
-                .help("Refresh")
+                .help(L10n.tr("Refresh"))
                 Menu {
-                    Picker("Show in menu bar", selection: $style) {
+                    Picker(L10n.tr("Show in menu bar"), selection: $style) {
                         ForEach(MenuBarLabelStyle.allCases) { Text($0.title).tag($0.rawValue) }
                     }
                     Divider()
-                    Button("Quit BlueIPRouter") { NSApp.terminate(nil) }
+                    Button(L10n.tr("Quit BlueIPRouter")) { NSApp.terminate(nil) }
                 } label: { Image(systemName: "ellipsis.circle") }
                 .menuStyle(.borderlessButton).fixedSize()
-                .help("Options (the background service keeps running if you quit)")
+                .help(L10n.tr("Options (the background service keeps running if you quit)"))
             }
         }
         .padding(14)
@@ -265,8 +265,8 @@ struct MenuBarView: View {
         let names = [egress, lan].compactMap { $0 }.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                speedTile("arrow.down.circle.fill", "Download", model.internetRate.rx, .blue)
-                speedTile("arrow.up.circle.fill", "Upload", model.internetRate.tx, .green)
+                speedTile("arrow.down.circle.fill", L10n.tr("Download"), model.internetRate.rx, .blue)
+                speedTile("arrow.up.circle.fill", L10n.tr("Upload"), model.internetRate.tx, .green)
             }
             ForEach(names, id: \.self) { n in
                 HStack {

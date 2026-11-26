@@ -7,17 +7,17 @@ enum InterfaceKind: String, Hashable, Sendable {
 
     var label: String {
         switch self {
-        case .wifi: return "Wi-Fi"
-        case .ethernet: return "Ethernet"
-        case .thunderbolt: return "Thunderbolt"
-        case .tunnel: return "Tunnel (utun)"
-        case .ppp: return "PPP VPN"
-        case .ipsec: return "IPsec VPN"
-        case .loopback: return "Loopback"
-        case .bridge: return "Bridge"
-        case .wirelessDirect: return "Apple Wireless Direct"
-        case .system: return "System"
-        case .other: return "Other"
+        case .wifi: return L10n.tr("Wi-Fi")
+        case .ethernet: return L10n.tr("Ethernet")
+        case .thunderbolt: return L10n.tr("Thunderbolt")
+        case .tunnel: return L10n.tr("Tunnel (utun)")
+        case .ppp: return L10n.tr("PPP VPN")
+        case .ipsec: return L10n.tr("IPsec VPN")
+        case .loopback: return L10n.tr("Loopback")
+        case .bridge: return L10n.tr("Bridge")
+        case .wirelessDirect: return L10n.tr("Apple Wireless Direct")
+        case .system: return L10n.tr("System")
+        case .other: return L10n.tr("Other")
         }
     }
 

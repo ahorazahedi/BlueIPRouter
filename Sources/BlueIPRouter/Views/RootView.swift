@@ -8,13 +8,13 @@ struct RootView: View {
         @Bindable var model = model
         NavigationSplitView {
             List(selection: $model.selection) {
-                Section("Overview") {
+                Section(L10n.tr("Overview")) {
                     row(.dashboard)
                     row(.connections)
                     row(.traffic)
                     row(.speedTest)
                 }
-                Section("Routing") {
+                Section(L10n.tr("Routing")) {
                     row(.rules, badge: model.pendingChanges.count)
                     row(.profiles)
                     row(.killSwitch, badge: model.killSwitchPending ? 1 : 0)
@@ -23,7 +23,7 @@ struct RootView: View {
                     row(.pathCheck)
                     row(.dns)
                 }
-                Section("System") {
+                Section(L10n.tr("System")) {
                     row(.adapters)
                     row(.automation, badge: model.automationPending ? 1 : 0)
                     row(.service)
@@ -69,19 +69,19 @@ struct RootView: View {
                 }
                 Button {
                     Task { await model.refresh() }
-                } label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                    .help("Refresh network state (⌘R)")
+                } label: { Label(L10n.tr("Refresh"), systemImage: "arrow.clockwise") }
+                    .help(L10n.tr("Refresh network state (⌘R)"))
                 Button {
                     Task { await model.apply() }
                 } label: {
-                    Label(model.hasPending ? "Apply \(model.pendingCount) Change\(model.pendingCount == 1 ? "" : "s")" : "Applied",
+                    Label(model.hasPending ? L10n.tr("Apply (%@)", L10n.pluralChange(model.pendingCount)) : L10n.tr("Applied"),
                           systemImage: model.hasPending ? "checkmark.seal" : "checkmark.seal.fill")
                 }
                 .labelStyle(.titleAndIcon)
                 .buttonStyle(.borderedProminent)
                 .tint(model.hasPending ? .accentColor : .green)
                 .disabled(!model.hasPending)
-                .help("Write your rules to the system and update routes (⌘↩)")
+                .help(L10n.tr("Write your rules to the system and update routes (⌘↩)"))
             }
         }
         .sheet(isPresented: $model.showImport) { ImportRoutesSheet().environment(model) }
@@ -90,7 +90,7 @@ struct RootView: View {
             RuleEditor(rule: rule).environment(model)
         }
         .alert(item: $model.alert) { info in
-            Alert(title: Text(info.title), message: Text(info.message), dismissButton: .default(Text("OK")))
+            Alert(title: Text(info.title), message: Text(info.message), dismissButton: .default(Text(L10n.tr("OK"))))
         }
         .task { await model.start() }
     }
@@ -115,16 +115,16 @@ struct SidebarFooter: View {
             if let route = model.net.internetRoute, let i = route.interface {
                 HStack(spacing: 6) {
                     Image(systemName: "globe").font(.caption)
-                    Text("Internet via \(model.displayName(i)) (\(i))").font(.caption).lineLimit(1)
+                    Text(L10n.tr("Internet via %@ (%@)", model.displayName(i), i)).font(.caption).lineLimit(1)
                 }.foregroundStyle(.secondary)
             }
             if let ks = model.net.helperStatus?.killSwitch, ks.active {
                 HStack(spacing: 6) {
                     Image(systemName: "hand.raised.fill").font(.caption).foregroundStyle(.green)
-                    Text("Kill switch armed").font(.caption)
+                    Text(L10n.tr("Kill switch armed")).font(.caption)
                 }
             }
-            Text("Updated \(model.net.takenAt.formatted(date: .omitted, time: .standard))")
+            Text(L10n.tr("Updated %@", model.net.takenAt.formatted(date: .omitted, time: .standard)))
                 .font(.caption2).foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 14)
@@ -140,8 +140,8 @@ struct SidebarFooter: View {
 
     private var serviceText: String {
         let s = model.net.service
-        if s.daemonInstalled && s.loaded { return "Persistence on" }
-        if s.helperInstalled { return "Persistence off" }
-        return "Helper not installed"
+        if s.daemonInstalled && s.loaded { return L10n.tr("Persistence on") }
+        if s.helperInstalled { return L10n.tr("Persistence off") }
+        return L10n.tr("Helper not installed")
     }
 }

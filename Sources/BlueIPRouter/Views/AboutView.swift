@@ -29,18 +29,18 @@ struct AboutView: View {
                 .frame(width: 96, height: 96)
             VStack(spacing: 4) {
                 Text("BlueIPRouter").font(.largeTitle.weight(.semibold))
-                Text("Version \(AppInfo.version)").foregroundStyle(.secondary)
+                Text(L10n.tr("Version %@", AppInfo.version)).foregroundStyle(.secondary)
             }
-            Text("Per-destination routing, split tunneling and a pf kill switch for macOS.")
+            Text(L10n.tr("Per-destination routing, split tunneling and a pf kill switch for macOS."))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 6) {
-                Text("Created by").font(.caption).foregroundStyle(.secondary).textCase(.uppercase)
+                Text(L10n.tr("Created by")).font(.caption).foregroundStyle(.secondary).textCase(.uppercase)
                 Text(AppInfo.author).font(.title2.weight(.semibold))
                 HStack(spacing: 10) {
                     LinkButton(title: "GitHub", symbol: "chevron.left.forwardslash.chevron.right", url: AppInfo.authorGitHub)
-                    LinkButton(title: "Website", symbol: "globe", url: AppInfo.authorWebsite)
+                    LinkButton(title: L10n.tr("Website"), symbol: "globe", url: AppInfo.authorWebsite)
                 }
             }
             .padding(16)
@@ -52,21 +52,21 @@ struct AboutView: View {
                 Button {
                     Task { await model.checkForUpdates(manual: true) }
                 } label: {
-                    if model.checkingForUpdates { ProgressView().controlSize(.small) } else { Label("Check for Updates", systemImage: "arrow.down.circle") }
+                    if model.checkingForUpdates { ProgressView().controlSize(.small) } else { Label(L10n.tr("Check for Updates"), systemImage: "arrow.down.circle") }
                 }
                 if let u = model.availableUpdate {
-                    Button("Download \(u.version)") { NSWorkspace.shared.open(u.downloadURL ?? u.pageURL) }.buttonStyle(.borderedProminent)
+                    Button(L10n.tr("Download %@", u.version)) { NSWorkspace.shared.open(u.downloadURL ?? u.pageURL) }.buttonStyle(.borderedProminent)
                 }
             }
 
             HStack(spacing: 16) {
-                Link("Source code", destination: AppInfo.repository)
-                Link("Report an issue", destination: AppInfo.issues)
-                Link("MIT License", destination: AppInfo.license)
+                Link(L10n.tr("Source code"), destination: AppInfo.repository)
+                Link(L10n.tr("Report an issue"), destination: AppInfo.issues)
+                Link(L10n.tr("MIT License"), destination: AppInfo.license)
             }
             .font(.callout)
 
-            Text("© \(Calendar.current.component(.year, from: Date())) \(AppInfo.author). Released under the MIT License.")
+            Text(L10n.tr("© %lld %@. Released under the MIT License.", Calendar.current.component(.year, from: Date()), AppInfo.author))
                 .font(.caption).foregroundStyle(.tertiary)
         }
         .padding(compact ? 28 : 40)
@@ -95,7 +95,7 @@ struct AboutMenuButton: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Button("About BlueIPRouter") {
+        Button(L10n.tr("About BlueIPRouter")) {
             openWindow(id: "about")
             NSApp.activate(ignoringOtherApps: true)
         }

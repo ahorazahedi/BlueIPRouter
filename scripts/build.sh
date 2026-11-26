@@ -17,14 +17,24 @@ BUILD_NUMBER="${BUILD_NUMBER:-1}"
 # GitHub repository the app checks for updates (owner/name)
 REPOSITORY="${REPOSITORY:-ahorazahedi/BlueIPRouter}"
 
+# CommandLineTools with MacOSX27.x SDK may lack SwiftUIMacros plugin from full Xcode;
+# fall back to MacOSX26.5.sdk when available so SwiftUI apps compile cleanly without full Xcode.
+EXTRA_SWIFTC_FLAGS=""
+if [ -z "${SDKROOT:-}" ] && [ ! -d "/Applications/Xcode.app" ]; then
+  if [ -d "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk" ]; then
+    export SDKROOT="/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk"
+    EXTRA_SWIFTC_FLAGS="-Xswiftc -sdk -Xswiftc $SDKROOT"
+  fi
+fi
+
 if [ "${UNIVERSAL:-0}" = "1" ]; then
   # Apple Silicon + Intel in one app. Builds each architecture separately (works without full Xcode)
   # and merges them with lipo.
   echo "==> Compiling (release, arm64 + x86_64)"
-  swift build -c release --triple arm64-apple-macosx14.0
-  swift build -c release --triple x86_64-apple-macosx14.0
-  ARM=$(swift build -c release --triple arm64-apple-macosx14.0 --show-bin-path)
-  X86=$(swift build -c release --triple x86_64-apple-macosx14.0 --show-bin-path)
+  swift build -c release --triple arm64-apple-macosx14.0 $EXTRA_SWIFTC_FLAGS
+  swift build -c release --triple x86_64-apple-macosx14.0 $EXTRA_SWIFTC_FLAGS
+  ARM=$(swift build -c release --triple arm64-apple-macosx14.0 $EXTRA_SWIFTC_FLAGS --show-bin-path)
+  X86=$(swift build -c release --triple x86_64-apple-macosx14.0 $EXTRA_SWIFTC_FLAGS --show-bin-path)
   BIN="$ROOT/build/universal"
   rm -rf "$BIN" && mkdir -p "$BIN"
   for exe in BlueIPRouter blueiprouter-helper; do
@@ -34,12 +44,12 @@ if [ "${UNIVERSAL:-0}" = "1" ]; then
 elif [ -n "${ARCH:-}" ]; then
   # Build for one architecture regardless of the build machine (e.g. ARCH=arm64 on an Intel Mac).
   echo "==> Compiling (release, $ARCH)"
-  swift build -c release --triple "$ARCH-apple-macosx14.0"
-  BIN=$(swift build -c release --triple "$ARCH-apple-macosx14.0" --show-bin-path)
+  swift build -c release --triple "$ARCH-apple-macosx14.0" $EXTRA_SWIFTC_FLAGS
+  BIN=$(swift build -c release --triple "$ARCH-apple-macosx14.0" $EXTRA_SWIFTC_FLAGS --show-bin-path)
 else
   echo "==> Compiling (release)"
-  swift build -c release
-  BIN=$(swift build -c release --show-bin-path)
+  swift build -c release $EXTRA_SWIFTC_FLAGS
+  BIN=$(swift build -c release $EXTRA_SWIFTC_FLAGS --show-bin-path)
 fi
 
 ICNS="$ROOT/build/AppIcon.icns"
@@ -56,6 +66,12 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/BlueIPRouter" "$APP/Contents/MacOS/BlueIPRouter"
 cp "$BIN/blueiprouter-helper" "$APP/Contents/MacOS/blueiprouter-helper"
 cp "$ICNS" "$APP/Contents/Resources/AppIcon.icns"
+for bundle in "$BIN"/BlueIPRouter_*.bundle; do
+  [ -d "$bundle" ] && cp -R "$bundle" "$APP/Contents/Resources/"
+done
+for lproj in "$ROOT"/Sources/BlueIPRouter/Resources/*.lproj; do
+  [ -d "$lproj" ] && cp -R "$lproj" "$APP/Contents/Resources/"
+done
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -70,6 +86,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$BUILD_NUMBER</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key>
+  <array>
+    <string>en</string>
+    <string>ru</string>
+  </array>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
   <key>NSHighResolutionCapable</key><true/>

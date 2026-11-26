@@ -28,51 +28,52 @@ struct BlueIPRouterApp: App {
         Window("BlueIPRouter", id: "main") {
             RootView()
                 .environment(model)
+                .id(model.languageVersion)
                 .frame(minWidth: 1100, minHeight: 720)
         }
         .defaultSize(width: 1320, height: 860)
         .commands {
             CommandGroup(replacing: .appInfo) {
                 AboutMenuButton()
-                Button("Check for Updates…") { Task { await model.checkForUpdates(manual: true) } }
+                Button(L10n.tr("Check for Updates…")) { Task { await model.checkForUpdates(manual: true) } }
             }
             CommandGroup(after: .newItem) {
-                Button("New Routing Rule") { model.selection = .rules; model.newRule() }
+                Button(L10n.tr("New Routing Rule")) { model.selection = .rules; model.newRule() }
                     .keyboardShortcut("n")
             }
-            CommandMenu("Routing") {
-                Button("Apply Changes") { Task { await model.apply() } }
+            CommandMenu(L10n.tr("Routing")) {
+                Button(L10n.tr("Apply Changes")) { Task { await model.apply() } }
                     .keyboardShortcut(.return, modifiers: [.command])
                     .disabled(!model.hasPending)
-                Button("Refresh") { Task { await model.refresh() } }
+                Button(L10n.tr("Refresh")) { Task { await model.refresh() } }
                     .keyboardShortcut("r")
-                Button("Refresh Public IPs") { Task { await model.refreshPublicIPs() } }
+                Button(L10n.tr("Refresh Public IPs")) { Task { await model.refreshPublicIPs() } }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                 Divider()
-                Button("Check Path…") { model.selection = .pathCheck }
+                Button(L10n.tr("Check Path…")) { model.selection = .pathCheck }
                     .keyboardShortcut("k")
-                Button("Flush DNS Cache") { Task { await model.flushDNS() } }
+                Button(L10n.tr("Flush DNS Cache")) { Task { await model.flushDNS() } }
             }
             CommandGroup(after: .help) {
-                Button("Setup Assistant…") { model.showSetup = true }
+                Button(L10n.tr("Setup Assistant…")) { model.showSetup = true }
             }
         }
 
-        Window("About BlueIPRouter", id: "about") {
-            AboutView(compact: true).environment(model).frame(width: 520)
+        Window(L10n.tr("About BlueIPRouter"), id: "about") {
+            AboutView(compact: true).environment(model).id(model.languageVersion).frame(width: 520)
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
 
         MenuBarExtra(isInserted: $menuBarEnabled) {
-            MenuBarView().environment(model)
+            MenuBarView().environment(model).id(model.languageVersion)
         } label: {
             MenuBarLabel().environment(model)
         }
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsView().environment(model).frame(width: 520)
+            SettingsView().environment(model).id(model.languageVersion).frame(width: 520)
         }
     }
 }

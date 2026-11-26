@@ -10,23 +10,23 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .dashboard: return "Dashboard"
-        case .connections: return "Connections"
-        case .traffic: return "Traffic"
-        case .speedTest: return "Speed Test"
-        case .profiles: return "Profiles"
-        case .blockList: return "Block List"
-        case .dns: return "DNS"
-        case .automation: return "Automation"
-        case .rules: return "Routing Rules"
-        case .killSwitch: return "Kill Switch"
-        case .routes: return "Routing Table"
-        case .pathCheck: return "Path Check"
-        case .adapters: return "Network Adapters"
-        case .service: return "Persistence"
-        case .backup: return "Backup & Restore"
-        case .activity: return "Activity Log"
-        case .about: return "About"
+        case .dashboard: return L10n.tr("Dashboard")
+        case .connections: return L10n.tr("Connections")
+        case .traffic: return L10n.tr("Traffic")
+        case .speedTest: return L10n.tr("Speed Test")
+        case .profiles: return L10n.tr("Profiles")
+        case .blockList: return L10n.tr("Block List")
+        case .dns: return L10n.tr("DNS")
+        case .automation: return L10n.tr("Automation")
+        case .rules: return L10n.tr("Routing Rules")
+        case .killSwitch: return L10n.tr("Kill Switch")
+        case .routes: return L10n.tr("Routing Table")
+        case .pathCheck: return L10n.tr("Path Check")
+        case .adapters: return L10n.tr("Network Adapters")
+        case .service: return L10n.tr("Persistence")
+        case .backup: return L10n.tr("Backup & Restore")
+        case .activity: return L10n.tr("Activity Log")
+        case .about: return L10n.tr("About")
         }
     }
     var symbol: String {
@@ -61,7 +61,10 @@ struct ActivityEntry: Identifiable, Hashable {
 }
 
 struct PendingChange: Identifiable, Hashable {
-    enum Kind: String { case added = "Added", removed = "Removed", modified = "Modified" }
+    enum Kind: String {
+        case added = "Added", removed = "Removed", modified = "Modified"
+        var title: String { L10n.tr(rawValue) }
+    }
     var kind: Kind
     var rule: RouteRule
     var id: UUID { rule.id }
@@ -124,7 +127,15 @@ final class AppModel {
     let speedTest = SpeedTestRunner()
     var availableUpdate: AvailableUpdate?
     var checkingForUpdates = false
+    var language: AppLanguage = AppLanguage.stored
+    var languageVersion = 0
     private var lastEgress: String?
+
+    func setLanguage(_ lang: AppLanguage) {
+        AppLanguage.stored = lang
+        language = lang
+        languageVersion += 1
+    }
     private var lastPublicRefresh = Date.distantPast
     private var lastBytes: [String: (UInt64, UInt64)] = [:]
     private var lastSample: Date?
@@ -210,17 +221,17 @@ final class AppModel {
         var results: [PublicIPResult] = []
         var ips = Set<String>()
         await withTaskGroup(of: (PublicIPResult, [String]).self) { group in
-            group.addTask { await Probes.probePath(id: "default", title: "System default path", interface: nil) }
+            group.addTask { await Probes.probePath(id: "default", title: L10n.tr("System default path"), interface: nil) }
             for c in candidates {
                 let title = "\(interfaceDisplayName(c.name, info: c, aliases: aliases)) (\(c.name))"
                 if c.isFullTunnel || c.name == egress {
                     results.append(PublicIPResult(id: c.name, title: title, interface: c.name,
-                                                  v4Error: "Carries the system default path (see above)"))
+                                                  v4Error: L10n.tr("Carries the system default path (see above)")))
                 } else if let nw = available.first(where: { $0.name == c.name }) {
                     group.addTask { await Probes.probePath(id: c.name, title: title, interface: nw) }
                 } else {
                     results.append(PublicIPResult(id: c.name, title: title, interface: c.name,
-                                                  v4Error: "macOS does not let apps pin traffic to this interface"))
+                                                  v4Error: L10n.tr("macOS does not let apps pin traffic to this interface")))
                 }
             }
             for await (r, found) in group {
@@ -245,10 +256,10 @@ final class AppModel {
         lastPublicRefresh = Date()
         if let before, let after = publicIPs.first(where: { $0.id == "default" })?.v4, after.ip != before.ip,
            workspace.settings.notifications.publicIP {
-            let country = before.country != after.country ? " — country \(before.country ?? "?") → \(after.country ?? "?")" : ""
-            Notifier.post("Public IP changed\(after.flag.map { " " + $0 } ?? "")",
+            let country = before.country != after.country ? L10n.tr(" — country %@ → %@", before.country ?? "?", after.country ?? "?") : ""
+            Notifier.post(L10n.tr("Public IP changed") + (after.flag.map { " " + $0 } ?? ""),
                           "\(before.ip) → \(after.ip)\(country)\n\([after.location, after.org ?? ""].filter { !$0.isEmpty }.joined(separator: " · "))")
-            log("Public IP changed", ok: true, "\(before.ip) → \(after.ip)")
+            log(L10n.tr("Public IP changed"), ok: true, "\(before.ip) → \(after.ip)")
         }
     }
 
@@ -287,14 +298,14 @@ final class AppModel {
             availableUpdate = update
             if let update {
                 if !manual && workspace.settings.notifications.updates {
-                    Notifier.post("BlueIPRouter \(update.version) is available", "Open the app to download it.")
+                    Notifier.post(L10n.tr("BlueIPRouter %@ is available", update.version), L10n.tr("Open the app to download it."))
                 }
-                log("Update available: \(update.version)", ok: true)
+                log(L10n.tr("Update available: %@", update.version), ok: true)
             } else if manual {
-                alert = AlertInfo(title: "You're up to date", message: "BlueIPRouter \(BIR.version) is the latest version.")
+                alert = AlertInfo(title: L10n.tr("You're up to date"), message: L10n.tr("BlueIPRouter %@ is the latest version.", BIR.version))
             }
         } catch {
-            if manual { showError("Could not check for updates", error.localizedDescription) }
+            if manual { showError(L10n.tr("Could not check for updates"), error.localizedDescription) }
         }
     }
 
@@ -307,12 +318,12 @@ final class AppModel {
         } else {
             workspace.automation.blocked.append(BlockEntry(value: v, note: note))
         }
-        log("Added \(v) to the block list", ok: true, "Press Apply to enforce it.")
+        log(L10n.tr("Added %@ to the block list", v), ok: true, L10n.tr("Press Apply to enforce it."))
     }
 
     func blockAndApply(_ value: String, note: String = "") async {
         block(value, note: note)
-        await apply(title: "block \(value)")
+        await apply(title: L10n.tr("block %@", value))
     }
 
     /// Connections a speed test can run on: direct over the LAN link (default), the system default path
@@ -322,17 +333,17 @@ final class AppModel {
         var out: [SpeedPath] = []
         let egress = net.internetRoute?.interface
         if let lan = localInterface, let nw = available.first(where: { $0.name == lan.name }) {
-            out.append(SpeedPath(id: "direct", title: "Direct over \(displayName(lan.name)) (\(lan.name))",
-                                 detail: "Bypasses the VPN: your ISP's raw speed, the same way your direct rules reach the internet.",
+            out.append(SpeedPath(id: "direct", title: L10n.tr("Direct over %@ (%@)", displayName(lan.name), lan.name),
+                                 detail: L10n.tr("Bypasses the VPN: your ISP's raw speed, the same way your direct rules reach the internet."),
                                  interfaceName: lan.name, nw: nw))
         }
-        out.append(SpeedPath(id: "default", title: "System default" + (egress.map { " — through \(displayName($0)) (\($0))" } ?? ""),
-                             detail: "What your apps get right now, e.g. through the full-tunnel VPN.", interfaceName: egress, nw: nil))
+        out.append(SpeedPath(id: "default", title: L10n.tr("System default") + (egress.map { L10n.tr(" — through %@ (%@)", displayName($0), $0) } ?? ""),
+                             detail: L10n.tr("What your apps get right now, e.g. through the full-tunnel VPN."), interfaceName: egress, nw: nil))
         for i in net.interfaces where i.isActive && i.ipv4 != nil && (i.kind.isVPN || i.kind.isPhysical)
             && i.name != localInterface?.name && i.name != egress {
             if let nw = available.first(where: { $0.name == i.name }) {
                 out.append(SpeedPath(id: i.name, title: "\(displayName(i.name)) (\(i.name))",
-                                     detail: "Pinned to this interface. It must have internet access.", interfaceName: i.name, nw: nw))
+                                     detail: L10n.tr("Pinned to this interface. It must have internet access."), interfaceName: i.name, nw: nw))
             }
         }
         return out
@@ -340,12 +351,12 @@ final class AppModel {
 
     func describe(_ action: TriggerAction) -> String {
         switch action {
-        case .activateProfile(let id): return "switch to “\(workspace.automation.profiles.first { $0.id == id }?.name ?? "deleted profile")”"
-        case .clearProfile: return "clear the profile"
-        case .killSwitchOn: return "kill switch on"
-        case .killSwitchOff: return "kill switch off"
-        case .killSwitchAuto: return "kill switch to its setting"
-        case .learnVPNServers: return "re-learn VPN servers"
+        case .activateProfile(let id): return L10n.tr("switch to “%@”", workspace.automation.profiles.first { $0.id == id }?.name ?? L10n.tr("deleted profile"))
+        case .clearProfile: return L10n.tr("clear the profile")
+        case .killSwitchOn: return L10n.tr("kill switch on")
+        case .killSwitchOff: return L10n.tr("kill switch off")
+        case .killSwitchAuto: return L10n.tr("kill switch to its setting")
+        case .learnVPNServers: return L10n.tr("re-learn VPN servers")
         }
     }
 
@@ -408,22 +419,25 @@ final class AppModel {
         switch via {
         case .interfaceRouter(let i):
             let r = interface(i)?.router.map { " → \($0)" } ?? ""
-            return "\(displayName(i)) (\(i)) router\(r)"
-        case .interfaceDirect(let i): return "Direct on \(displayName(i)) (\(i))"
-        case .gateway(let g): return "Gateway \(g)"
+            return L10n.tr("%@ (%@) router%@", displayName(i), i, r)
+        case .interfaceDirect(let i): return L10n.tr("Direct on %@ (%@)", displayName(i), i)
+        case .gateway(let g): return L10n.tr("Gateway %@", g)
         }
     }
 
-    func owner(of entry: RouteEntry) -> String? {
+    func ownerInfo(of entry: RouteEntry) -> (text: String, isRule: Bool)? {
         guard let cidr = entry.cidr else { return nil }
         if let m = net.helperStatus?.installedRoutes.first(where: { $0.destination == cidr.address && $0.prefix == cidr.prefix }) {
-            return "Rule: " + (workspace.rules.first { $0.id == m.ruleID }?.name ?? "deleted")
+            let name = workspace.rules.first { $0.id == m.ruleID }?.name ?? L10n.tr("deleted")
+            return (L10n.tr("Rule: %@", name), true)
         }
         if interface(entry.netif)?.isFullTunnel == true, NetworkScanner.catchAllDestinations.contains(entry.destination) {
-            return "Tunnel catch-all"
+            return (L10n.tr("Tunnel catch-all"), false)
         }
         return nil
     }
+
+    func owner(of entry: RouteEntry) -> String? { ownerInfo(of: entry)?.text }
 
     /// The physical LAN connection (Wi-Fi/Ethernet) even when a VPN is the primary interface.
     var localInterface: InterfaceInfo? {
@@ -450,12 +464,12 @@ final class AppModel {
         busy = title
         defer { busy = nil }
         do {
-            let out = try Privileged.run(commands, prompt: "BlueIPRouter wants to: \(title).", stopOnError: stopOnError)
+            let out = try Privileged.run(commands, prompt: L10n.tr("BlueIPRouter wants to: %@.", title), stopOnError: stopOnError)
             log(title, ok: true, out)
             await refresh()
             return true
         } catch PrivilegedError.cancelled {
-            log(title, ok: false, "Cancelled by user")
+            log(title, ok: false, L10n.tr("Cancelled by user"))
             return false
         } catch {
             log(title, ok: false, error.localizedDescription)
@@ -483,7 +497,7 @@ final class AppModel {
     func duplicate(_ rule: RouteRule) {
         var copy = rule
         copy.id = UUID()
-        copy.name += " copy"
+        copy.name += L10n.tr(" copy")
         workspace.rules.append(copy)
     }
 
@@ -499,19 +513,19 @@ final class AppModel {
         workspace.rules = net.appliedRules
         if let ks = net.appliedKillSwitch { workspace.killSwitch = ks } else { workspace.killSwitch.enabled = false }
         workspace.automation = net.appliedAutomation ?? AutomationConfig()
-        log("Discarded pending changes", ok: true)
+        log(L10n.tr("Discarded pending changes"), ok: true)
     }
 
     // MARK: Apply
 
-    func apply(extraCommands: [String] = [], title: String = "apply routing changes") async {
+    func apply(extraCommands: [String] = [], title: String = L10n.tr("apply routing changes")) async {
         let invalid = workspace.rules.filter { !$0.validationErrors.isEmpty }
         if let bad = invalid.first {
-            showError("Rule “\(bad.name.isEmpty ? "Untitled" : bad.name)” is invalid", bad.validationErrors.joined(separator: "\n"))
+            showError(L10n.tr("Rule “%@” is invalid", bad.name.isEmpty ? L10n.tr("Untitled") : bad.name), bad.validationErrors.joined(separator: "\n"))
             return
         }
         if workspace.killSwitch.enabled, let e = workspace.killSwitch.validationErrors.first {
-            showError("Kill switch settings are invalid", e)
+            showError(L10n.tr("Kill switch settings are invalid"), e)
             return
         }
         do {
@@ -547,17 +561,17 @@ final class AppModel {
                 autoBackup("Applied")
                 if let failing = net.helperStatus?.rules.filter({ $0.state == .failed || $0.state == .partial }), !failing.isEmpty {
                     let names = failing.compactMap { st in workspace.rules.first { $0.id == st.ruleID }?.name }
-                    showError("Some rules were not fully applied", names.joined(separator: ", ") + "\nOpen Routing Rules for details.")
+                    showError(L10n.tr("Some rules were not fully applied"), names.joined(separator: ", ") + "\n" + L10n.tr("Open Routing Rules for details."))
                 }
             }
         } catch {
-            showError("Could not apply", error.localizedDescription)
+            showError(L10n.tr("Could not apply"), error.localizedDescription)
         }
     }
 
     func runServiceNow() async {
         guard net.service.helperInstalled else { await apply(); return }
-        await runPrivileged("re-check all routes now", ["\(shq(BIR.helperBinary)) apply --trigger manual"])
+        await runPrivileged(L10n.tr("re-check all routes now"), ["\(shq(BIR.helperBinary)) apply --trigger manual"])
     }
 
     // MARK: Persistence service
@@ -566,21 +580,21 @@ final class AppModel {
         do {
             if enabled {
                 let cmds = try Privileged.installHelperCommands() + Privileged.installDaemonCommands(interval: workspace.settings.serviceIntervalSeconds)
-                await runPrivileged("turn on the background route service", cmds)
+                await runPrivileged(L10n.tr("turn on the background route service"), cmds)
             } else {
-                await runPrivileged("turn off the background route service", Privileged.removeDaemonCommands)
+                await runPrivileged(L10n.tr("turn off the background route service"), Privileged.removeDaemonCommands)
             }
         } catch {
-            showError("Background service", error.localizedDescription)
+            showError(L10n.tr("Background service"), error.localizedDescription)
         }
     }
 
     func setOpenAtLogin(_ enabled: Bool) {
         do {
             try LoginItem.set(enabled)
-            log(enabled ? "Turned on Open at Login" : "Turned off Open at Login", ok: true)
+            log(L10n.tr(enabled ? "Turned on Open at Login" : "Turned off Open at Login"), ok: true)
         } catch {
-            showError("Open at Login", error.localizedDescription)
+            showError(L10n.tr("Open at Login"), error.localizedDescription)
         }
         openAtLogin = LoginItem.isEnabled
         loginItemNeedsApproval = LoginItem.needsApproval
@@ -645,10 +659,10 @@ final class AppModel {
             case .interfaceRouter(let i), .interfaceDirect(let i): label = displayName(i)
             case .gateway(let g): label = g
             }
-            workspace.rules.append(RouteRule(name: "Imported via \(label)", destinations: items.map(\.destination), via: via,
-                                             persistent: persistent, notes: "Imported from the routing table on \(Date().formatted(date: .abbreviated, time: .omitted))"))
+            workspace.rules.append(RouteRule(name: L10n.tr("Imported via %@", label), destinations: items.map(\.destination), via: via,
+                                             persistent: persistent, notes: L10n.tr("Imported from the routing table on %@", Date().formatted(date: .abbreviated, time: .omitted))))
         }
-        log("Imported \(candidates.count) static routes into \(groups.count) rules", ok: true)
+        log(L10n.tr("Imported %lld static routes into %lld rules", candidates.count, groups.count), ok: true)
         selection = .rules
     }
 
@@ -672,7 +686,7 @@ final class AppModel {
             cmds.append("rm -rf \(shq(BIR.systemDir)) \(shq(BIR.runDir))")
         }
         var ok = true
-        if !cmds.isEmpty { ok = await runPrivileged("reset routing to default", cmds, stopOnError: false) }
+        if !cmds.isEmpty { ok = await runPrivileged(L10n.tr("reset routing to default"), cmds, stopOnError: false) }
         guard ok else { return }
         if o.deleteRules {
             workspace.rules = []
@@ -683,7 +697,7 @@ final class AppModel {
             workspace.aliases = [:]
             workspace.settings = AppSettings()
         }
-        log("Reset to default", ok: true, "routes: \(o.removeRoutes), rules: \(o.deleteRules), service: \(o.uninstallService)")
+        log(L10n.tr("Reset to default"), ok: true, "routes: \(o.removeRoutes), rules: \(o.deleteRules), service: \(o.uninstallService)")
     }
 
     // MARK: Backup & restore
@@ -709,9 +723,9 @@ final class AppModel {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try Storage.write(makeBundle(reason: "Manual export"), to: url)
-            log("Exported backup", ok: true, url.path)
+            log(L10n.tr("Exported backup"), ok: true, url.path)
         } catch {
-            showError("Export failed", error.localizedDescription)
+            showError(L10n.tr("Export failed"), error.localizedDescription)
         }
     }
 
@@ -721,7 +735,7 @@ final class AppModel {
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
         do { return try Storage.readBackup(url) } catch {
-            showError("Cannot read backup", error.localizedDescription)
+            showError(L10n.tr("Cannot read backup"), error.localizedDescription)
             return nil
         }
     }
@@ -741,7 +755,7 @@ final class AppModel {
             workspace.aliases.merge(bundle.aliases) { _, new in new }
             workspace.settings = bundle.settings
         }
-        log("Restored backup from \(bundle.createdAt.formatted())", ok: true, "\(bundle.rules.count) rules, \(replace ? "replaced" : "merged")")
+        log(L10n.tr("Restored backup from %@", bundle.createdAt.formatted()), ok: true, L10n.tr(replace ? "%lld rules, replaced" : "%lld rules, merged", bundle.rules.count))
         selection = .rules
     }
 
@@ -756,21 +770,21 @@ final class AppModel {
     func detectVPNServers() async {
         do {
             let cmds = try Privileged.installHelperCommands() + ["\(shq(BIR.helperBinary)) detect-vpn"]
-            await runPrivileged("detect the servers your VPN is connected to", cmds)
+            await runPrivileged(L10n.tr("detect the servers your VPN is connected to"), cmds)
         } catch {
-            showError("Detect VPN servers", error.localizedDescription)
+            showError(L10n.tr("Detect VPN servers"), error.localizedDescription)
         }
     }
 
     func forgetLearnedServers() async {
-        await runPrivileged("forget learned VPN servers", ["rm -f \(shq(BIR.learnedServers))"])
+        await runPrivileged(L10n.tr("forget learned VPN servers"), ["rm -f \(shq(BIR.learnedServers))"])
     }
 
     /// Downloads a block list's published ranges (e.g. Telegram's cidr.txt) and replaces its entries.
     func updateBlockList(_ id: UUID) async {
         guard let i = workspace.killSwitch.blockLists.firstIndex(where: { $0.id == id }),
               let source = workspace.killSwitch.blockLists[i].sourceURL, let url = URL(string: source) else { return }
-        busy = "downloading \(workspace.killSwitch.blockLists[i].name) ranges"
+        busy = L10n.tr("downloading %@ ranges", workspace.killSwitch.blockLists[i].name)
         defer { busy = nil }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -778,55 +792,55 @@ final class AppModel {
                 .map { $0.trimmingCharacters(in: .whitespaces) }.filter { CIDR.normalize($0) != nil }
             guard !entries.isEmpty else { throw URLError(.cannotParseResponse) }
             workspace.killSwitch.blockLists[i].entries = entries
-            log("Updated \(workspace.killSwitch.blockLists[i].name) ranges", ok: true, entries.joined(separator: "\n"))
+            log(L10n.tr("Updated %@ ranges", workspace.killSwitch.blockLists[i].name), ok: true, entries.joined(separator: "\n"))
         } catch {
-            showError("Could not download ranges", error.localizedDescription)
+            showError(L10n.tr("Could not download ranges"), error.localizedDescription)
         }
     }
 
     func turnOffKillSwitchNow() async {
         workspace.killSwitch.enabled = false
-        await apply(title: "turn off the kill switch")
+        await apply(title: L10n.tr("turn off the kill switch"))
     }
 
     // MARK: Adapters
 
     private func validIface(_ name: String) -> Bool {
         if Validation.isInterfaceName(name) { return true }
-        showError("Invalid interface", name)
+        showError(L10n.tr("Invalid interface"), name)
         return false
     }
 
     func setInterface(_ name: String, up: Bool) async {
         guard validIface(name) else { return }
-        await runPrivileged("\(up ? "enable" : "disable") interface \(name)", ["/sbin/ifconfig \(name) \(up ? "up" : "down")"])
+        await runPrivileged(L10n.tr(up ? "enable interface %@" : "disable interface %@", name), ["/sbin/ifconfig \(name) \(up ? "up" : "down")"])
     }
 
     func setWiFiPower(_ name: String, on: Bool) async {
         guard validIface(name) else { return }
-        await runPrivileged("turn Wi-Fi \(on ? "on" : "off") (\(name))", ["/usr/sbin/networksetup -setairportpower \(name) \(on ? "on" : "off")"])
+        await runPrivileged(L10n.tr(on ? "turn Wi-Fi on (%@)" : "turn Wi-Fi off (%@)", name), ["/usr/sbin/networksetup -setairportpower \(name) \(on ? "on" : "off")"])
     }
 
     func renewDHCP(_ name: String) async {
         guard validIface(name) else { return }
-        await runPrivileged("renew the DHCP lease on \(name)", ["/usr/sbin/ipconfig set \(name) DHCP"])
+        await runPrivileged(L10n.tr("renew the DHCP lease on %@", name), ["/usr/sbin/ipconfig set \(name) DHCP"])
     }
 
     func setMTU(_ name: String, _ mtu: Int) async {
         guard validIface(name) else { return }
-        guard (576...9000).contains(mtu) else { showError("Invalid MTU", "Use a value between 576 and 9000."); return }
-        await runPrivileged("set the MTU of \(name) to \(mtu)", ["/sbin/ifconfig \(name) mtu \(mtu)"])
+        guard (576...9000).contains(mtu) else { showError(L10n.tr("Invalid MTU"), L10n.tr("Use a value between 576 and 9000.")); return }
+        await runPrivileged(L10n.tr("set the MTU of %@ to %lld", name, mtu), ["/sbin/ifconfig \(name) mtu \(mtu)"])
     }
 
     func setDNS(service: String, servers: [String]) async {
         let bad = servers.filter { !IPv4.isValid($0) && !Validation.isIPv6($0) }
-        guard bad.isEmpty else { showError("Invalid DNS server", bad.joined(separator: ", ")); return }
+        guard bad.isEmpty else { showError(L10n.tr("Invalid DNS server"), bad.joined(separator: ", ")); return }
         let list = servers.isEmpty ? "Empty" : servers.joined(separator: " ")
-        await runPrivileged("set DNS servers for \(service)", ["/usr/sbin/networksetup -setdnsservers \(shq(service)) \(list)"])
+        await runPrivileged(L10n.tr("set DNS servers for %@", service), ["/usr/sbin/networksetup -setdnsservers \(shq(service)) \(list)"])
     }
 
     func flushDNS() async {
-        await runPrivileged("flush the DNS cache", ["/usr/bin/dscacheutil -flushcache", "/usr/bin/killall -HUP mDNSResponder"])
+        await runPrivileged(L10n.tr("flush the DNS cache"), ["/usr/bin/dscacheutil -flushcache", "/usr/bin/killall -HUP mDNSResponder"])
     }
 
     func setAlias(_ name: String, _ alias: String) {
@@ -838,20 +852,20 @@ final class AppModel {
 
     func deleteRoute(_ e: RouteEntry) async {
         let safe = e.destination.allSatisfy { $0.isHexDigit || ".:/%".contains($0) || $0.isLetter || $0.isNumber }
-        guard safe, Validation.isInterfaceName(e.netif) || e.netif.isEmpty else { showError("Cannot delete", "Unexpected route format"); return }
+        guard safe, Validation.isInterfaceName(e.netif) || e.netif.isEmpty else { showError(L10n.tr("Cannot delete"), L10n.tr("Unexpected route format")); return }
         var cmd = "/sbin/route -n delete"
         if e.family == "inet6" { cmd += " -inet6" }
         if e.isDefault { cmd += " default" } else { cmd += (e.isHost ? " -host " : " -net ") + shq(e.destination) }
         if e.isScoped && !e.netif.isEmpty { cmd += " -ifscope \(e.netif)" }
-        await runPrivileged("delete route \(e.destination) via \(e.netif)", [cmd])
+        await runPrivileged(L10n.tr("delete route %@ via %@", e.destination, e.netif), [cmd])
     }
 
     func addOneOffRoute(destination: String, via: RouteVia) async {
-        guard let d = Destination.parse(destination), d.kindLabel != "Domain" else {
-            showError("Invalid destination", "Use an IPv4 address or CIDR network. For domains, create a rule.")
+        guard let d = Destination.parse(destination), !d.isDomain else {
+            showError(L10n.tr("Invalid destination"), L10n.tr("Use an IPv4 address or CIDR network. For domains, create a rule."))
             return
         }
-        if let e = via.validationError { showError("Invalid next hop", e); return }
+        if let e = via.validationError { showError(L10n.tr("Invalid next hop"), e); return }
         var cmd = "/sbin/route -n add "
         switch d {
         case .host(let ip): cmd += "-host \(ip)"
@@ -862,10 +876,10 @@ final class AppModel {
         case .gateway(let g): cmd += " \(g)"
         case .interfaceDirect(let i): cmd += " -interface \(i)"
         case .interfaceRouter(let i):
-            guard let r = interface(i)?.router else { showError("No router", "\(i) has no router right now."); return }
+            guard let r = interface(i)?.router else { showError(L10n.tr("No router"), L10n.tr("%@ has no router right now.", i)); return }
             cmd += " \(r)"
         }
-        await runPrivileged("add a one-off route for \(d.display)", [cmd])
+        await runPrivileged(L10n.tr("add a one-off route for %@", d.display), [cmd])
     }
 
     // MARK: Path check
@@ -884,12 +898,16 @@ final class AppModel {
         pathResult = result
         for i in result.hops.indices {
             switch await Probes.tcpConnect(ip: result.hops[i].ip, port: 443) {
-            case .success(let ms): result.hops[i].tcp443 = String(format: "TCP 443 reachable in %.0f ms", ms)
-            case .failure(let e): result.hops[i].tcp443 = "TCP 443 not reachable (\(e.localizedDescription))"
+            case .success(let ms):
+                result.hops[i].tcp443 = L10n.tr("TCP 443 reachable in %.0f ms", ms)
+                result.hops[i].tcp443Reachable = true
+            case .failure(let e):
+                result.hops[i].tcp443 = L10n.tr("TCP 443 not reachable (%@)", e.localizedDescription)
+                result.hops[i].tcp443Reachable = false
             }
             pathResult = result
         }
-        log("Path check: \(result.query)", ok: result.error == nil, result.hops.map { "\($0.ip): \($0.headline)" }.joined(separator: "\n"))
+        log(L10n.tr("Path check: %@", result.query), ok: result.error == nil, result.hops.map { "\($0.ip): \($0.headline)" }.joined(separator: "\n"))
     }
 
     func openPathCheck(_ query: String) {

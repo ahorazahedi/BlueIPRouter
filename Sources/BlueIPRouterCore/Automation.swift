@@ -26,7 +26,12 @@ public struct NetworkFingerprint: Codable, Hashable, Sendable {
         self.routerMAC = routerMAC
     }
 
-    public var label: String { "router \(routerIP)" + (routerMAC.map { " (\($0))" } ?? "") + " on \(interface)" }
+    public var label: String {
+        if let routerMAC {
+            return CoreL10n.tr("router %@ (%@) on %@", "роутер %@ (%@) на %@", routerIP, routerMAC, interface)
+        }
+        return CoreL10n.tr("router %@ on %@", "роутер %@ на %@", routerIP, interface)
+    }
 
     /// The first physical-looking interface with a router: its router IP and MAC.
     public static func current(interfaces: [InterfaceSnapshot]) -> NetworkFingerprint? {
@@ -98,12 +103,12 @@ public enum TriggerEvent: Codable, Hashable, Sendable {
 
     public var label: String {
         switch self {
-        case .tunnelUp: return "Full-tunnel VPN connects"
-        case .tunnelDown: return "Full-tunnel VPN disconnects"
-        case .interfaceUp(let i): return "\(i) comes up"
-        case .interfaceDown(let i): return "\(i) goes down"
-        case .egressChanged: return "Internet traffic switches interface"
-        case .networkChanged: return "Joined a different network"
+        case .tunnelUp: return CoreL10n.tr("Full-tunnel VPN connects", "Полнотуннельный VPN подключается")
+        case .tunnelDown: return CoreL10n.tr("Full-tunnel VPN disconnects", "Полнотуннельный VPN отключается")
+        case .interfaceUp(let i): return CoreL10n.tr("%@ comes up", "%@ поднимается", i)
+        case .interfaceDown(let i): return CoreL10n.tr("%@ goes down", "%@ отключается", i)
+        case .egressChanged: return CoreL10n.tr("Internet traffic switches interface", "Интернет-трафик меняет интерфейс")
+        case .networkChanged: return CoreL10n.tr("Joined a different network", "Подключение к другой сети")
         }
     }
 
@@ -163,9 +168,9 @@ public struct DomainResolver: Codable, Hashable, Sendable, Identifiable {
     public var validationError: String? {
         let d = domain.lowercased()
         guard Validation.isDomain(d) || (d.split(separator: ".").count == 1 && d.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" } && !d.isEmpty)
-        else { return "“\(domain)” is not a valid domain" }
-        if nameservers.isEmpty { return "\(domain): add at least one name server" }
-        if let bad = nameservers.first(where: { !IPv4.isValid($0) && !Validation.isIPv6($0) }) { return "\(domain): “\(bad)” is not an IP address" }
+        else { return CoreL10n.tr("“%@” is not a valid domain", "«%@» не является корректным доменом", domain) }
+        if nameservers.isEmpty { return CoreL10n.tr("%@: add at least one name server", "%@: добавьте хотя бы один DNS-сервер", domain) }
+        if let bad = nameservers.first(where: { !IPv4.isValid($0) && !Validation.isIPv6($0) }) { return CoreL10n.tr("%@: “%@” is not an IP address", "%@: «%@» не является IP-адресом", domain, bad) }
         return nil
     }
 
@@ -223,12 +228,12 @@ public struct AutomationConfig: Codable, Hashable, Sendable {
 
     /// Which profile is in force, and why: a trigger override, then the current network, then the manual choice.
     public func effectiveProfile(override: UUID?, network: NetworkFingerprint?) -> (profile: RoutingProfile?, reason: String) {
-        if let o = override, let p = profiles.first(where: { $0.id == o }) { return (p, "set by a trigger") }
+        if let o = override, let p = profiles.first(where: { $0.id == o }) { return (p, CoreL10n.tr("set by a trigger", "выбран триггером")) }
         if autoSwitchByNetwork, let p = profiles.first(where: { $0.networks.contains { $0.matches(network) } }) {
-            return (p, "matched network \(network?.label ?? "")")
+            return (p, CoreL10n.tr("matched network %@", "совпала сеть %@", network?.label ?? ""))
         }
-        if let m = manualProfileID, let p = profiles.first(where: { $0.id == m }) { return (p, "chosen manually") }
-        return (nil, "no profile: all enabled rules apply")
+        if let m = manualProfileID, let p = profiles.first(where: { $0.id == m }) { return (p, CoreL10n.tr("chosen manually", "выбран вручную")) }
+        return (nil, CoreL10n.tr("no profile: all enabled rules apply", "без профиля: действуют все включённые правила"))
     }
 }
 

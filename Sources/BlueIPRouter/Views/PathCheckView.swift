@@ -9,17 +9,17 @@ struct PathCheckView: View {
         @Bindable var model = model
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                PageHeader(title: "Path Check", subtitle: "Find out which interface and gateway an IP or domain uses")
+                PageHeader(title: L10n.tr("Path Check"), subtitle: L10n.tr("Find out which interface and gateway an IP or domain uses"))
 
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                    TextField("IP address or domain, e.g. example.com", text: $model.pathQuery)
+                    TextField(L10n.tr("IP address or domain, e.g. example.com"), text: $model.pathQuery)
                         .textFieldStyle(.plain)
                         .font(.title3)
                         .focused($focused)
                         .onSubmit { Task { await model.checkPath() } }
                     if model.pathChecking { ProgressView().controlSize(.small) }
-                    Button("Check") { Task { await model.checkPath() } }
+                    Button(L10n.tr("Check")) { Task { await model.checkPath() } }
                         .buttonStyle(.borderedProminent)
                         .keyboardShortcut(.defaultAction)
                         .disabled(model.pathQuery.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -29,7 +29,7 @@ struct PathCheckView: View {
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.1)))
 
                 HStack(spacing: 8) {
-                    Text("Try:").foregroundStyle(.secondary)
+                    Text(L10n.tr("Try:")).foregroundStyle(.secondary)
                     ForEach(suggestions, id: \.self) { s in
                         Button(s) { Task { await model.checkPath(s) } }.buttonStyle(.bordered).controlSize(.small)
                     }
@@ -51,16 +51,16 @@ struct PathCheckView: View {
     @ViewBuilder
     private func result(_ r: PathCheckResult) -> some View {
         if r.isDomain {
-            Card("DNS", symbol: "text.magnifyingglass") {
-                KeyValueRow(key: "Name", value: r.query)
+            Card(L10n.tr("DNS"), symbol: "text.magnifyingglass") {
+                KeyValueRow(key: L10n.tr("Name"), value: r.query)
                 KeyValueRow(key: "IPv4", value: r.ipv4.joined(separator: ", "))
                 KeyValueRow(key: "IPv6", value: r.ipv6.joined(separator: ", "))
-                KeyValueRow(key: "Lookup time", value: r.dnsMs.map { String(format: "%.0f ms", $0) } ?? "", mono: false)
-                KeyValueRow(key: "Resolver", value: model.net.systemDNS.joined(separator: ", "))
+                KeyValueRow(key: L10n.tr("Lookup time"), value: r.dnsMs.map { String(format: L10n.tr("%.0f ms"), $0) } ?? "", mono: false)
+                KeyValueRow(key: L10n.tr("Resolver"), value: model.net.systemDNS.joined(separator: ", "))
             }
         }
         if let e = r.error {
-            Banner(symbol: "exclamationmark.triangle", tint: .orange, title: "Note", message: e, actions: AnyView(EmptyView()))
+            Banner(symbol: "exclamationmark.triangle", tint: .orange, title: L10n.tr("Note"), message: e, actions: AnyView(EmptyView()))
         }
         ForEach(r.hops) { hop in hopCard(hop) }
         if !r.hops.isEmpty { tracerouteCard(r) }
@@ -76,15 +76,15 @@ struct PathCheckView: View {
                     HStack {
                         Text(hop.ip).font(.title3.monospaced().weight(.semibold)).textSelection(.enabled)
                         Spacer()
-                        Button("Block", role: .destructive) {
+                        Button(L10n.tr("Block"), role: .destructive) {
                             let target = model.pathResult?.isDomain == true ? model.pathResult!.query : hop.ip
-                            Task { await model.blockAndApply(target, note: "Blocked from Path Check") }
+                            Task { await model.blockAndApply(target, note: L10n.tr("Blocked from Path Check")) }
                         }
-                        .help("Add to the block list and apply")
+                        .help(L10n.tr("Add to the block list and apply"))
                         if let ruleID = hop.ruleID, let rule = model.workspace.rules.first(where: { $0.id == ruleID }) {
-                            Button("Edit Rule “\(rule.name)”") { model.editingRule = rule }
+                            Button(L10n.tr("Edit Rule “%@”", rule.name)) { model.editingRule = rule }
                         } else {
-                            Button("Create Rule for this IP") {
+                            Button(L10n.tr("Create Rule for this IP")) {
                                 model.selection = .rules
                                 model.newRule(destination: model.pathResult?.isDomain == true ? model.pathResult!.query : hop.ip)
                             }
@@ -93,9 +93,9 @@ struct PathCheckView: View {
                     Text(hop.headline).font(.headline).foregroundStyle(hop.verdict.color)
                     if let l = hop.lookup {
                         HStack(spacing: 8) {
-                            Pill(text: "Interface \(l.interface ?? "?")", color: .secondary)
-                            Pill(text: "Gateway \(l.gateway ?? "none")", color: .secondary)
-                            Pill(text: "Route \(l.matchedRouteLabel)", color: .secondary)
+                            Pill(text: L10n.tr("Interface %@", l.interface ?? "?"), color: .secondary)
+                            Pill(text: L10n.tr("Gateway %@", l.gateway ?? L10n.tr("none")), color: .secondary)
+                            Pill(text: L10n.tr("Route %@", l.matchedRouteLabel), color: .secondary)
                             ForEach(l.flags.prefix(5), id: \.self) { Pill(text: $0, color: .secondary) }
                         }
                     }
@@ -103,10 +103,11 @@ struct PathCheckView: View {
                         Label(line, systemImage: "info.circle").font(.callout).foregroundStyle(.secondary)
                     }
                     if let t = hop.tcp443 {
-                        Label(t, systemImage: t.contains("reachable in") ? "checkmark.circle" : "xmark.circle")
-                            .font(.callout).foregroundStyle(t.contains("reachable in") ? .green : .orange)
+                        let ok = hop.tcp443Reachable ?? true
+                        Label(t, systemImage: ok ? "checkmark.circle" : "xmark.circle")
+                            .font(.callout).foregroundStyle(ok ? .green : .orange)
                     } else {
-                        HStack { ProgressView().controlSize(.mini); Text("Testing TCP 443…").font(.callout).foregroundStyle(.secondary) }
+                        HStack { ProgressView().controlSize(.mini); Text(L10n.tr("Testing TCP 443…")).font(.callout).foregroundStyle(.secondary) }
                     }
                 }
             }
@@ -114,19 +115,19 @@ struct PathCheckView: View {
     }
 
     private func tracerouteCard(_ r: PathCheckResult) -> some View {
-        Card("Traceroute", symbol: "point.3.connected.trianglepath.dotted",
+        Card(L10n.tr("Traceroute"), symbol: "point.3.connected.trianglepath.dotted",
              trailing: AnyView(HStack {
                  if model.traceroute.running {
                      ProgressView().controlSize(.small)
-                     Button("Stop") { model.traceroute.stop() }
+                     Button(L10n.tr("Stop")) { model.traceroute.stop() }
                  } else {
-                     Button("Run Traceroute to \(r.hops.first?.ip ?? "")") {
+                     Button(L10n.tr("Run Traceroute to %@", r.hops.first?.ip ?? "")) {
                          if let ip = r.hops.first?.ip { model.traceroute.start(target: ip) }
                      }
                  }
              })) {
             if model.traceroute.lines.isEmpty {
-                Text("Shows each router hop on the way. Hops through a tunnel appear as the tunnel's far end.")
+                Text(L10n.tr("Shows each router hop on the way. Hops through a tunnel appear as the tunnel's far end."))
                     .font(.callout).foregroundStyle(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 2) {

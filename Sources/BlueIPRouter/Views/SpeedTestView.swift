@@ -7,7 +7,7 @@ import SwiftUI
 enum SpeedUnit: String, CaseIterable, Identifiable {
     case mbps, mBps
     var id: String { rawValue }
-    var label: String { self == .mbps ? "Mbps" : "MB/s" }
+    var label: String { self == .mbps ? L10n.tr("Mbps") : L10n.tr("MB/s") }
     var other: SpeedUnit { self == .mbps ? .mBps : .mbps }
 
     /// Converts megabits per second into this unit (1 MB/s = 8 Mbps).
@@ -40,13 +40,13 @@ struct SpeedTestView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                PageHeader(title: "Speed Test", subtitle: "Download, upload, ping and jitter — on the connection you choose") {
-                    Picker("Unit", selection: $unitRaw) {
+                PageHeader(title: L10n.tr("Speed Test"), subtitle: L10n.tr("Download, upload, ping and jitter — on the connection you choose")) {
+                    Picker(L10n.tr("Unit"), selection: $unitRaw) {
                         ForEach(SpeedUnit.allCases) { Text($0.label).tag($0.rawValue) }
                     }
                     .pickerStyle(.segmented)
                     .frame(width: 150)
-                    .help("Megabits per second (what ISPs advertise) or megabytes per second (what file downloads show). 1 MB/s = 8 Mbps.")
+                    .help(L10n.tr("Megabits per second (what ISPs advertise) or megabytes per second (what file downloads show). 1 MB/s = 8 Mbps."))
                 }
                 controls
                 HStack(alignment: .top, spacing: 16) {
@@ -64,12 +64,12 @@ struct SpeedTestView: View {
         .onChange(of: engineRaw) { _, _ in
             if engine == .libreSpeed { Task { await runner.loadLibreServers() } }
         }
-        .alert("This test uses a lot of data", isPresented: $showDataAlert) {
-            Button("Start Test") { begin() }
-            Button("Start and Don't Ask Again") { skipWarning = true; begin() }
-            Button("Cancel", role: .cancel) {}
+        .alert(L10n.tr("This test uses a lot of data"), isPresented: $showDataAlert) {
+            Button(L10n.tr("Start Test")) { begin() }
+            Button(L10n.tr("Start and Don't Ask Again")) { skipWarning = true; begin() }
+            Button(L10n.tr("Cancel"), role: .cancel) {}
         } message: {
-            Text("A speed test uses roughly 100–300 MB of data (more on very fast connections). If \(selectedPath?.title ?? "this connection") is metered or goes through a VPN with a data limit, that usage counts against it.")
+            Text(L10n.tr("A speed test uses roughly 100–300 MB of data (more on very fast connections). If %@ is metered or goes through a VPN with a data limit, that usage counts against it.", selectedPath?.title ?? L10n.tr("this connection")))
         }
     }
 
@@ -79,7 +79,7 @@ struct SpeedTestView: View {
         Card {
             HStack(alignment: .center, spacing: 16) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Picker("Connection", selection: $pathID) {
+                    Picker(L10n.tr("Connection"), selection: $pathID) {
                         ForEach(paths) { p in Text(p.title).tag(p.id) }
                     }
                     .frame(maxWidth: 520)
@@ -87,14 +87,14 @@ struct SpeedTestView: View {
                         Text(p.detail).font(.caption).foregroundStyle(.secondary)
                     }
                     HStack(spacing: 12) {
-                        Picker("Server", selection: $engineRaw) {
+                        Picker(L10n.tr("Server"), selection: $engineRaw) {
                             ForEach(SpeedEngine.allCases) { Text($0.title).tag($0.rawValue) }
                         }
                         .pickerStyle(.segmented)
                         .frame(width: 260)
                         if engine == .libreSpeed {
                             Picker("", selection: $libreServerID) {
-                                Text("Fastest server (automatic)").tag("auto")
+                                Text(L10n.tr("Fastest server (automatic)")).tag("auto")
                                 ForEach(runner.libreServers) { Text($0.name).tag($0.id) }
                             }
                             .labelsHidden()
@@ -102,19 +102,19 @@ struct SpeedTestView: View {
                             if runner.libreServers.isEmpty { ProgressView().controlSize(.small) }
                         }
                     }
-                    Label("Uses roughly 100–300 MB of data per test.", systemImage: "exclamationmark.triangle")
+                    Label(L10n.tr("Uses roughly 100–300 MB of data per test."), systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.orange)
                 }
                 .disabled(runner.isRunning)
                 Spacer()
                 if runner.isRunning {
                     Button(role: .destructive) { runner.stop() } label: {
-                        Label("Stop", systemImage: "stop.fill").frame(width: 140, height: 34)
+                        Label(L10n.tr("Stop"), systemImage: "stop.fill").frame(width: 140, height: 34)
                     }
                     .controlSize(.large)
                 } else {
                     Button { requestStart() } label: {
-                        Label(runner.phase == .done ? "Test Again" : "Start Test", systemImage: "speedometer").frame(width: 150, height: 34)
+                        Label(runner.phase == .done ? L10n.tr("Test Again") : L10n.tr("Start Test"), systemImage: "speedometer").frame(width: 150, height: 34)
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
@@ -132,7 +132,7 @@ struct SpeedTestView: View {
         guard let p = selectedPath else { return }
         runner.start(engine: engine, libreServerID: libreServerID == "auto" ? nil : libreServerID, path: p,
                      geo: model.workspace.settings.geoProvider)
-        model.log("Speed test started", ok: true, "\(engine.title) on \(p.title)")
+        model.log(L10n.tr("Speed test started"), ok: true, "\(engine.title) on \(p.title)")
     }
 
     // MARK: Dial
@@ -156,14 +156,14 @@ struct SpeedTestView: View {
 
     private var statusText: String {
         switch runner.phase {
-        case .idle: return "Ready when you are"
-        case .server: return "Finding a server…"
-        case .ping: return "Measuring ping…"
-        case .download: return "Testing download…"
-        case .upload: return "Testing upload…"
-        case .done: return "Download result"
-        case .failed: return "Test failed"
-        case .cancelled: return "Stopped"
+        case .idle: return L10n.tr("Ready when you are")
+        case .server: return L10n.tr("Finding a server…")
+        case .ping: return L10n.tr("Measuring ping…")
+        case .download: return L10n.tr("Testing download…")
+        case .upload: return L10n.tr("Testing upload…")
+        case .done: return L10n.tr("Download result")
+        case .failed: return L10n.tr("Test failed")
+        case .cancelled: return L10n.tr("Stopped")
         }
     }
 
@@ -203,16 +203,16 @@ struct SpeedTestView: View {
     // MARK: Results
 
     private var resultsCard: some View {
-        Card("Result", symbol: "gauge.with.needle") {
+        Card(L10n.tr("Result"), symbol: "gauge.with.needle") {
             HStack(spacing: 12) {
-                speedTile("arrow.down", "Download", runner.downloadMbps, SpeedDial.Style.download.color, highlight: runner.phase == .download)
-                speedTile("arrow.up", "Upload", runner.uploadMbps, SpeedDial.Style.upload.color, highlight: runner.phase == .upload)
+                speedTile("arrow.down", L10n.tr("Download"), runner.downloadMbps, SpeedDial.Style.download.color, highlight: runner.phase == .download)
+                speedTile("arrow.up", L10n.tr("Upload"), runner.uploadMbps, SpeedDial.Style.upload.color, highlight: runner.phase == .upload)
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2), spacing: 12) {
-                metric("timer", "Ping", runner.pingMs.map { String(format: "%.0f", $0) } ?? "—", "ms", .orange)
-                metric("waveform.path", "Jitter", runner.jitterMs.map { String(format: "%.1f", $0) } ?? "—", "ms", .purple)
-                metric("hourglass", "Ping under load", runner.loadedPingMs.map { String(format: "%.0f", $0) } ?? "—", "ms", .pink)
-                metric("chart.bar.fill", "Bufferbloat", bufferbloat, "", bufferbloatColor)
+                metric("timer", L10n.tr("Ping"), runner.pingMs.map { String(format: "%.0f", $0) } ?? "—", L10n.tr("ms"), .orange)
+                metric("waveform.path", L10n.tr("Jitter"), runner.jitterMs.map { String(format: "%.1f", $0) } ?? "—", L10n.tr("ms"), .purple)
+                metric("hourglass", L10n.tr("Ping under load"), runner.loadedPingMs.map { String(format: "%.0f", $0) } ?? "—", L10n.tr("ms"), .pink)
+                metric("chart.bar.fill", L10n.tr("Bufferbloat"), bufferbloat, "", bufferbloatColor)
             }
             Divider()
             if let id = runner.identity {
@@ -225,7 +225,7 @@ struct SpeedTestView: View {
                     }
                 }
             } else {
-                Text(runner.isRunning ? "Looking up the public IP of this connection…" : "The public IP of the tested connection appears here.")
+                Text(runner.isRunning ? L10n.tr("Looking up the public IP of this connection…") : L10n.tr("The public IP of the tested connection appears here."))
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -263,7 +263,7 @@ struct SpeedTestView: View {
         guard let idle = runner.pingMs, let loaded = runner.loadedPingMs else { return "—" }
         let extra = max(0, loaded - idle)
         let grade = extra < 30 ? "A" : (extra < 100 ? "B" : (extra < 300 ? "C" : "D"))
-        return "\(grade)  +\(Int(extra)) ms"
+        return "\(grade)  +\(Int(extra)) \(L10n.tr("ms"))"
     }
 
     private var bufferbloatColor: Color {
@@ -288,28 +288,28 @@ struct SpeedTestView: View {
     // MARK: History
 
     private var historyCard: some View {
-        Card("History", symbol: "clock.arrow.circlepath",
-             trailing: AnyView(Button("Clear") {
+        Card(L10n.tr("History"), symbol: "clock.arrow.circlepath",
+             trailing: AnyView(Button(L10n.tr("Clear")) {
                  runner.history.removeAll()
                  SpeedHistoryStore.save([])
              }.disabled(runner.history.isEmpty))) {
             if runner.history.isEmpty {
-                Text("Past results appear here, so you can compare the VPN and the direct connection over time.")
+                Text(L10n.tr("Past results appear here, so you can compare the VPN and the direct connection over time."))
                     .foregroundStyle(.secondary)
             } else {
                 Chart(runner.history.suffix(40)) { r in
-                    PointMark(x: .value("Date", r.date), y: .value(unit.label, unit.value(r.downloadMbps)))
-                        .foregroundStyle(by: .value("Connection", r.pathTitle))
-                        .symbol(by: .value("Connection", r.pathTitle))
-                    LineMark(x: .value("Date", r.date), y: .value(unit.label, unit.value(r.downloadMbps)))
-                        .foregroundStyle(by: .value("Connection", r.pathTitle))
+                    PointMark(x: .value(L10n.tr("Date"), r.date), y: .value(unit.label, unit.value(r.downloadMbps)))
+                        .foregroundStyle(by: .value(L10n.tr("Connection"), r.pathTitle))
+                        .symbol(by: .value(L10n.tr("Connection"), r.pathTitle))
+                    LineMark(x: .value(L10n.tr("Date"), r.date), y: .value(unit.label, unit.value(r.downloadMbps)))
+                        .foregroundStyle(by: .value(L10n.tr("Connection"), r.pathTitle))
                 }
-                .chartYAxisLabel("Download (\(unit.label))")
+                .chartYAxisLabel(L10n.tr("Download (%@)", unit.label))
                 .chartLegend(position: .bottom)
                 .frame(height: 200)
                 Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
                     GridRow {
-                        Text("When"); Text("Connection"); Text("Server"); Text("Down"); Text("Up"); Text("Ping"); Text("IP")
+                        Text(L10n.tr("When")); Text(L10n.tr("Connection")); Text(L10n.tr("Server")); Text(L10n.tr("Down")); Text(L10n.tr("Up")); Text(L10n.tr("Ping")); Text("IP")
                     }
                     .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     ForEach(runner.history.suffix(15).reversed()) { r in
@@ -319,7 +319,7 @@ struct SpeedTestView: View {
                             Text(r.engine.title).font(.caption).foregroundStyle(.secondary)
                             Text("\(unit.format(r.downloadMbps)) \(unit.label)").monospacedDigit()
                             Text("\(unit.format(r.uploadMbps)) \(unit.label)").monospacedDigit()
-                            Text("\(Int(r.pingMs)) ms").monospacedDigit()
+                            Text("\(Int(r.pingMs)) \(L10n.tr("ms"))").monospacedDigit()
                             Text("\(r.flag ?? "") \(r.publicIP ?? "—")").font(.caption.monospaced())
                         }
                     }
@@ -334,9 +334,13 @@ struct SpeedTestView: View {
 struct PhaseSteps: View {
     var phase: SpeedTestRunner.Phase
 
-    private let steps: [(SpeedTestRunner.Phase, String, String)] = [
-        (.ping, "Ping", "timer"), (.download, "Download", "arrow.down"), (.upload, "Upload", "arrow.up"),
-    ]
+    private var steps: [(SpeedTestRunner.Phase, String, String)] {
+        [
+            (.ping, L10n.tr("Ping"), "timer"),
+            (.download, L10n.tr("Download"), "arrow.down"),
+            (.upload, L10n.tr("Upload"), "arrow.up"),
+        ]
+    }
 
     private func state(_ step: SpeedTestRunner.Phase) -> Int {
         let order: [SpeedTestRunner.Phase] = [.server, .ping, .download, .upload, .done]

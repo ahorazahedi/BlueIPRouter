@@ -8,7 +8,7 @@ enum PrivilegedError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .cancelled: return "Administrator authorization was cancelled."
+        case .cancelled: return L10n.tr("Administrator authorization was cancelled.")
         case .failed(let message): return message
         }
     }
@@ -28,12 +28,12 @@ enum Privileged {
         }
         let source = "do shell script \"\(escape(script))\" with prompt \"\(escape(prompt))\" "
             + "with administrator privileges without altering line endings"
-        guard let apple = NSAppleScript(source: source) else { throw PrivilegedError.failed("Could not prepare the command.") }
+        guard let apple = NSAppleScript(source: source) else { throw PrivilegedError.failed(L10n.tr("Could not prepare the command.")) }
         var error: NSDictionary?
         let result = apple.executeAndReturnError(&error)
         if let error {
             if (error[NSAppleScript.errorNumber] as? Int) == -128 { throw PrivilegedError.cancelled }
-            throw PrivilegedError.failed((error[NSAppleScript.errorMessage] as? String) ?? "The command failed.")
+            throw PrivilegedError.failed((error[NSAppleScript.errorMessage] as? String) ?? L10n.tr("The command failed."))
         }
         return result.stringValue ?? ""
     }
@@ -75,7 +75,7 @@ enum Privileged {
 
     static func installHelperCommands() throws -> [String] {
         guard let helper = bundledHelper else {
-            throw PrivilegedError.failed("The bundled helper is missing. Rebuild the app with scripts/build.sh.")
+            throw PrivilegedError.failed(L10n.tr("The bundled helper is missing. Rebuild the app with scripts/build.sh."))
         }
         return [
             "mkdir -p /Library/PrivilegedHelperTools \(shq(BIR.systemDir)) \(shq(BIR.runDir))",

@@ -11,37 +11,37 @@ struct ImportRoutesSheet: View {
     var body: some View {
         let candidates = model.importCandidates
         VStack(alignment: .leading, spacing: 14) {
-            Text("Import Static Routes").font(.title2.weight(.semibold))
-            Text("These routes were added outside BlueIPRouter (by hand, a script or another tool). Imported routes become rules, grouped by next hop. The live routes stay as they are, so nothing goes down while you switch.")
+            Text(L10n.tr("Import Static Routes")).font(.title2.weight(.semibold))
+            Text(L10n.tr("These routes were added outside BlueIPRouter (by hand, a script or another tool). Imported routes become rules, grouped by next hop. The live routes stay as they are, so nothing goes down while you switch."))
                 .foregroundStyle(.secondary)
             if candidates.isEmpty {
-                ContentUnavailableView("No static routes to import", systemImage: "checkmark.circle",
-                                       description: Text("Every static route is already managed by a rule or belongs to the system or a VPN client."))
+                ContentUnavailableView(L10n.tr("No static routes to import"), systemImage: "checkmark.circle",
+                                       description: Text(L10n.tr("Every static route is already managed by a rule or belongs to the system or a VPN client.")))
                     .frame(maxWidth: .infinity).frame(height: 220)
             } else {
                 Table(candidates, selection: $chosen) {
-                    TableColumn("Destination") { c in Text(c.destination).font(.body.monospaced()) }
-                    TableColumn("Gateway") { c in Text(c.entry.gateway).font(.body.monospaced()) }
-                    TableColumn("Interface") { c in Text("\(model.displayName(c.entry.netif)) (\(c.entry.netif))") }
-                    TableColumn("Becomes rule via") { c in Text(model.describe(c.via)).foregroundStyle(.secondary) }
+                    TableColumn(L10n.tr("Destination")) { c in Text(c.destination).font(.body.monospaced()) }
+                    TableColumn(L10n.tr("Gateway")) { c in Text(c.entry.gateway).font(.body.monospaced()) }
+                    TableColumn(L10n.tr("Interface")) { c in Text("\(model.displayName(c.entry.netif)) (\(c.entry.netif))") }
+                    TableColumn(L10n.tr("Becomes rule via")) { c in Text(model.describe(c.via)).foregroundStyle(.secondary) }
                 }
                 .frame(height: 260)
                 HStack {
-                    Button("Select All") { chosen = Set(candidates.map(\.id)) }
-                    Button("Select None") { chosen = [] }
+                    Button(L10n.tr("Select All")) { chosen = Set(candidates.map(\.id)) }
+                    Button(L10n.tr("Select None")) { chosen = [] }
                     Spacer()
                     Picker("", selection: $persistent) {
-                        Text("Persistent").tag(true)
-                        Text("Until reboot").tag(false)
+                        Text(L10n.tr("Persistent")).tag(true)
+                        Text(L10n.tr("Until reboot")).tag(false)
                     }
                     .pickerStyle(.segmented).frame(width: 220).labelsHidden()
                 }
             }
             HStack {
-                Text("Review the new rules, then press Apply.").font(.caption).foregroundStyle(.secondary)
+                Text(L10n.tr("Review the new rules, then press Apply.")).font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Import \(chosen.count) Route\(chosen.count == 1 ? "" : "s")") {
+                Button(L10n.tr("Cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(L10n.tr("Import (%@)", L10n.pluralRoute(chosen.count))) {
                     model.importRoutes(candidates.filter { chosen.contains($0.id) }, persistent: persistent)
                     dismiss()
                 }

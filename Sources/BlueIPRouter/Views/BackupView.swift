@@ -10,51 +10,51 @@ struct BackupView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                PageHeader(title: "Backup & Restore", subtitle: "Save, move and roll back your routing setup")
+                PageHeader(title: L10n.tr("Backup & Restore"), subtitle: L10n.tr("Save, move and roll back your routing setup"))
 
                 HStack(alignment: .top, spacing: 16) {
-                    Card("Export", symbol: "square.and.arrow.up") {
-                        Text("Saves all rules, interface aliases, settings and a snapshot of the current IPv4 routing table to a JSON file.")
+                    Card(L10n.tr("Export"), symbol: "square.and.arrow.up") {
+                        Text(L10n.tr("Saves all rules, interface aliases, settings and a snapshot of the current IPv4 routing table to a JSON file."))
                             .foregroundStyle(.secondary)
-                        Button("Export Backup…") { model.exportBackup() }.buttonStyle(.borderedProminent)
+                        Button(L10n.tr("Export Backup…")) { model.exportBackup() }.buttonStyle(.borderedProminent)
                     }
-                    Card("Import", symbol: "square.and.arrow.down") {
-                        Text("Loads rules from a backup file. You can review them and then press Apply.")
+                    Card(L10n.tr("Import"), symbol: "square.and.arrow.down") {
+                        Text(L10n.tr("Loads rules from a backup file. You can review them and then press Apply."))
                             .foregroundStyle(.secondary)
-                        Button("Restore from File…") { pendingRestore = model.pickBackupFile() }
+                        Button(L10n.tr("Restore from File…")) { pendingRestore = model.pickBackupFile() }
                     }
                 }
 
-                Card("Automatic snapshots", symbol: "clock.arrow.trianglehead.counterclockwise.rotate.90",
-                     trailing: AnyView(Button("Snapshot Now") { model.autoBackup("Manual snapshot") })) {
-                    Text("Taken after every successful Apply and before every restore or reset. Keeps the last \(model.workspace.settings.autoBackupLimit).")
+                Card(L10n.tr("Automatic snapshots"), symbol: "clock.arrow.trianglehead.counterclockwise.rotate.90",
+                     trailing: AnyView(Button(L10n.tr("Snapshot Now")) { model.autoBackup("Manual snapshot") })) {
+                    Text(L10n.tr("Taken after every successful Apply and before every restore or reset. Keeps the last %lld.", model.workspace.settings.autoBackupLimit))
                         .font(.callout).foregroundStyle(.secondary)
-                    if model.backups.isEmpty { Text("No snapshots yet").foregroundStyle(.secondary) }
+                    if model.backups.isEmpty { Text(L10n.tr("No snapshots yet")).foregroundStyle(.secondary) }
                     ForEach(model.backups) { b in
                         HStack {
                             Image(systemName: "doc.badge.clock").foregroundStyle(.secondary)
                             VStack(alignment: .leading) {
                                 Text(b.createdAt.formatted(date: .abbreviated, time: .standard)).fontWeight(.medium)
-                                Text("\(b.reason) · \(b.ruleCount) rule\(b.ruleCount == 1 ? "" : "s")").font(.caption).foregroundStyle(.secondary)
+                                Text("\(L10n.tr(b.reason)) · \(L10n.pluralRule(b.ruleCount))").font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([b.url]) }.buttonStyle(.borderless)
-                            Button("Restore…") { pendingRestore = try? Storage.readBackup(b.url) }
+                            Button(L10n.tr("Show in Finder")) { NSWorkspace.shared.activateFileViewerSelecting([b.url]) }.buttonStyle(.borderless)
+                            Button(L10n.tr("Restore…")) { pendingRestore = try? Storage.readBackup(b.url) }
                             Button(role: .destructive) { model.deleteBackup(b) } label: { Image(systemName: "trash") }.buttonStyle(.borderless)
                         }
                         Divider()
                     }
                 }
 
-                Card("Reset to default", symbol: "arrow.counterclockwise.circle") {
-                    Text("Puts the Mac's routing back to how it was before BlueIPRouter. Routes created by other apps (VPN clients, the system) are not touched.")
+                Card(L10n.tr("Reset to default"), symbol: "arrow.counterclockwise.circle") {
+                    Text(L10n.tr("Puts the Mac's routing back to how it was before BlueIPRouter. Routes created by other apps (VPN clients, the system) are not touched."))
                         .foregroundStyle(.secondary)
-                    Toggle("Take a snapshot first", isOn: $reset.backupFirst)
-                    Toggle("Remove all routes installed by BlueIPRouter", isOn: $reset.removeRoutes)
-                    Toggle("Delete all rules", isOn: $reset.deleteRules)
-                    Toggle("Uninstall the background service and helper", isOn: $reset.uninstallService)
-                    Toggle("Reset interface aliases and app settings", isOn: $reset.resetAliasesAndSettings)
-                    Button("Reset to Default…", role: .destructive) { confirmReset = true }
+                    Toggle(L10n.tr("Take a snapshot first"), isOn: $reset.backupFirst)
+                    Toggle(L10n.tr("Remove all routes installed by BlueIPRouter"), isOn: $reset.removeRoutes)
+                    Toggle(L10n.tr("Delete all rules"), isOn: $reset.deleteRules)
+                    Toggle(L10n.tr("Uninstall the background service and helper"), isOn: $reset.uninstallService)
+                    Toggle(L10n.tr("Reset interface aliases and app settings"), isOn: $reset.resetAliasesAndSettings)
+                    Button(L10n.tr("Reset to Default…"), role: .destructive) { confirmReset = true }
                         .buttonStyle(.borderedProminent).tint(.red)
                 }
             }
@@ -63,8 +63,8 @@ struct BackupView: View {
         .sheet(item: $pendingRestore) { bundle in
             RestoreSheet(bundle: bundle).environment(model)
         }
-        .confirmationDialog("Reset routing to default?", isPresented: $confirmReset) {
-            Button("Reset", role: .destructive) { Task { await model.reset(reset) } }
+        .confirmationDialog(L10n.tr("Reset routing to default?"), isPresented: $confirmReset) {
+            Button(L10n.tr("Reset"), role: .destructive) { Task { await model.reset(reset) } }
         } message: {
             Text(resetSummary)
         }
@@ -72,11 +72,11 @@ struct BackupView: View {
 
     private var resetSummary: String {
         var parts: [String] = []
-        if reset.removeRoutes { parts.append("remove \(model.net.helperStatus?.installedRoutes.count ?? 0) managed routes") }
-        if reset.deleteRules { parts.append("delete \(model.workspace.rules.count) rules") }
-        if reset.uninstallService { parts.append("uninstall the service") }
-        if reset.resetAliasesAndSettings { parts.append("reset aliases and settings") }
-        return "This will " + (parts.isEmpty ? "do nothing" : parts.joined(separator: ", ")) + "." + (reset.backupFirst ? " A snapshot is saved first." : "")
+        if reset.removeRoutes { parts.append(L10n.tr("remove %lld managed routes", model.net.helperStatus?.installedRoutes.count ?? 0)) }
+        if reset.deleteRules { parts.append(L10n.tr("delete %lld rules", model.workspace.rules.count)) }
+        if reset.uninstallService { parts.append(L10n.tr("uninstall the service")) }
+        if reset.resetAliasesAndSettings { parts.append(L10n.tr("reset aliases and settings")) }
+        return L10n.tr("This will %@.", parts.isEmpty ? L10n.tr("do nothing") : parts.joined(separator: ", ")) + (reset.backupFirst ? L10n.tr(" A snapshot is saved first.") : "")
     }
 }
 
@@ -89,12 +89,12 @@ struct RestoreSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Restore Backup").font(.title2.weight(.semibold))
-            KeyValueRow(key: "Created", value: bundle.createdAt.formatted(date: .long, time: .standard), mono: false)
-            KeyValueRow(key: "From", value: "\(bundle.hostName) · BlueIPRouter \(bundle.appVersion)", mono: false)
-            KeyValueRow(key: "Reason", value: bundle.reason, mono: false)
+            Text(L10n.tr("Restore Backup")).font(.title2.weight(.semibold))
+            KeyValueRow(key: L10n.tr("Created"), value: bundle.createdAt.formatted(date: .long, time: .standard), mono: false)
+            KeyValueRow(key: L10n.tr("From"), value: "\(bundle.hostName) · BlueIPRouter \(bundle.appVersion)", mono: false)
+            KeyValueRow(key: L10n.tr("Reason"), value: L10n.tr(bundle.reason), mono: false)
             Divider()
-            Text("\(bundle.rules.count) rules").font(.headline)
+            Text(L10n.pluralRule(bundle.rules.count)).font(.headline)
             List(bundle.rules) { r in
                 VStack(alignment: .leading) {
                     Text(r.name).fontWeight(.medium)
@@ -102,17 +102,17 @@ struct RestoreSheet: View {
                 }
             }
             .frame(height: 200)
-            Picker("Mode", selection: $replace) {
-                Text("Replace current rules").tag(true)
-                Text("Merge with current rules").tag(false)
+            Picker(L10n.tr("Mode"), selection: $replace) {
+                Text(L10n.tr("Replace current rules")).tag(true)
+                Text(L10n.tr("Merge with current rules")).tag(false)
             }
             .pickerStyle(.radioGroup)
-            Toggle("Also restore interface aliases and settings", isOn: $includeSettings)
-            Text("Restored rules show as unapplied changes until you press Apply.").font(.caption).foregroundStyle(.secondary)
+            Toggle(L10n.tr("Also restore interface aliases and settings"), isOn: $includeSettings)
+            Text(L10n.tr("Restored rules show as unapplied changes until you press Apply.")).font(.caption).foregroundStyle(.secondary)
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Restore") {
+                Button(L10n.tr("Cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(L10n.tr("Restore")) {
                     model.restore(bundle, replace: replace, includeSettings: includeSettings)
                     dismiss()
                 }

@@ -44,18 +44,18 @@ public enum RouteVia: Codable, Hashable, Sendable {
 
     public var modeLabel: String {
         switch self {
-        case .interfaceRouter: return "Interface router"
-        case .interfaceDirect: return "Direct on interface"
-        case .gateway: return "Specific gateway"
+        case .interfaceRouter: return CoreL10n.tr("Interface router", "Роутер интерфейса")
+        case .interfaceDirect: return CoreL10n.tr("Direct on interface", "Напрямую через интерфейс")
+        case .gateway: return CoreL10n.tr("Specific gateway", "Указанный шлюз")
         }
     }
 
     public var validationError: String? {
         switch self {
         case .interfaceRouter(let i), .interfaceDirect(let i):
-            return Validation.isInterfaceName(i) ? nil : "Choose a valid interface"
+            return Validation.isInterfaceName(i) ? nil : CoreL10n.tr("Choose a valid interface", "Выберите корректный интерфейс")
         case .gateway(let g):
-            return IPv4.isValid(g) ? nil : "Gateway must be an IPv4 address"
+            return IPv4.isValid(g) ? nil : CoreL10n.tr("Gateway must be an IPv4 address", "Шлюз должен быть IPv4-адресом")
         }
     }
 }
@@ -94,9 +94,9 @@ public struct RouteRule: Codable, Identifiable, Hashable, Sendable {
 
     public var validationErrors: [String] {
         var errors: [String] = []
-        if name.trimmingCharacters(in: .whitespaces).isEmpty { errors.append("Name is required") }
-        if destinations.isEmpty { errors.append("Add at least one IP, network or domain") }
-        for bad in invalidDestinations { errors.append("“\(bad)” is not a valid IPv4 address, CIDR network or domain") }
+        if name.trimmingCharacters(in: .whitespaces).isEmpty { errors.append(CoreL10n.tr("Name is required", "Укажите название")) }
+        if destinations.isEmpty { errors.append(CoreL10n.tr("Add at least one IP, network or domain", "Добавьте хотя бы один IP, подсеть или домен")) }
+        for bad in invalidDestinations { errors.append(CoreL10n.tr("“%@” is not a valid IPv4 address, CIDR network or domain", "«%@» не является корректным IPv4-адресом, подсетью CIDR или доменом", bad)) }
         if let e = via.validationError { errors.append(e) }
         return errors
     }
@@ -139,10 +139,15 @@ public enum Destination: Hashable, Sendable {
 
     public var kindLabel: String {
         switch self {
-        case .host: return "Host"
-        case .network: return "Network"
-        case .domain: return "Domain"
+        case .host: return CoreL10n.tr("Host", "Хост")
+        case .network: return CoreL10n.tr("Network", "Сеть")
+        case .domain: return CoreL10n.tr("Domain", "Домен")
         }
+    }
+
+    public var isDomain: Bool {
+        if case .domain = self { return true }
+        return false
     }
 }
 
@@ -185,7 +190,7 @@ public struct ManagedRoute: Codable, Hashable, Sendable, Identifiable {
         switch (gateway, interface) {
         case let (g?, i?): return "\(g) (\(i))"
         case let (g?, nil): return g
-        case let (nil, i?): return "direct on \(i)"
+        case let (nil, i?): return CoreL10n.tr("direct on %@", "напрямую через %@", i)
         default: return "?"
         }
     }

@@ -155,20 +155,20 @@ struct PendingBanner: View {
     var body: some View {
         if model.hasPending {
             let changes = model.pendingChanges
-            let items = changes.prefix(4).map { "\($0.kind.rawValue): \($0.rule.name)" } + (model.killSwitchPending ? ["Kill switch settings"] : [])
-                + (model.automationPending ? ["Profiles, triggers or DNS"] : [])
+            let items = changes.prefix(4).map { "\($0.kind.title): \($0.rule.name)" } + (model.killSwitchPending ? [L10n.tr("Kill switch settings")] : [])
+                + (model.automationPending ? [L10n.tr("Profiles, triggers or DNS")] : [])
             Banner(symbol: "exclamationmark.arrow.triangle.2.circlepath", tint: .orange,
-                   title: "\(model.pendingCount) unapplied change\(model.pendingCount == 1 ? "" : "s")",
+                   title: L10n.tr("Unapplied: %@", L10n.pluralChange(model.pendingCount)),
                    message: items.joined(separator: " · ") + (model.liveButUnmanaged.isEmpty ? "" :
-                       "\nThe routes of \(model.liveButUnmanaged.count) of these already exist on this Mac (added outside BlueIPRouter). Applying takes them over without interrupting traffic and makes them persistent."),
+                       "\n" + L10n.tr("The routes of %lld of these already exist on this Mac (added outside BlueIPRouter). Applying takes them over without interrupting traffic and makes them persistent.", model.liveButUnmanaged.count)),
                    actions: AnyView(HStack {
-                       Button("Discard…") { confirmDiscard = true }
-                       Button("Apply Changes") { Task { await model.apply() } }.buttonStyle(.borderedProminent)
+                       Button(L10n.tr("Discard…")) { confirmDiscard = true }
+                       Button(L10n.tr("Apply Changes")) { Task { await model.apply() } }.buttonStyle(.borderedProminent)
                    }))
-                .confirmationDialog("Discard \(model.pendingCount) unapplied change\(model.pendingCount == 1 ? "" : "s")?", isPresented: $confirmDiscard) {
-                    Button("Discard Changes", role: .destructive) { model.discardChanges() }
+                .confirmationDialog(L10n.tr("Discard unapplied changes (%@)?", L10n.pluralChange(model.pendingCount)), isPresented: $confirmDiscard) {
+                    Button(L10n.tr("Discard Changes"), role: .destructive) { model.discardChanges() }
                 } message: {
-                    Text("Your edits go back to what is applied on this Mac. This cannot be undone.")
+                    Text(L10n.tr("Your edits go back to what is applied on this Mac. This cannot be undone."))
                 }
         }
     }
@@ -176,23 +176,23 @@ struct PendingBanner: View {
 
 func ruleStateView(_ status: RuleStatus?, rule: RouteRule, pending: Bool, live: LiveCount? = nil) -> Pill {
     if pending {
-        if let live, live.allLive { return Pill(text: "Live · not managed", color: .blue, symbol: "bolt.horizontal.circle") }
-        if let live, live.live > 0 { return Pill(text: "Partly live \(live.live)/\(live.expected)", color: .orange, symbol: "clock") }
-        return Pill(text: "Not applied", color: .orange, symbol: "clock")
+        if let live, live.allLive { return Pill(text: L10n.tr("Live · not managed"), color: .blue, symbol: "bolt.horizontal.circle") }
+        if let live, live.live > 0 { return Pill(text: L10n.tr("Partly live %lld/%lld", live.live, live.expected), color: .orange, symbol: "clock") }
+        return Pill(text: L10n.tr("Not applied"), color: .orange, symbol: "clock")
     }
-    guard let status else { return Pill(text: "Unknown", color: .secondary, symbol: "questionmark") }
+    guard let status else { return Pill(text: L10n.tr("Unknown"), color: .secondary, symbol: "questionmark") }
     switch status.state {
-    case .applied: return Pill(text: "Active · \(status.routes.count)", color: .green, symbol: "checkmark.circle.fill")
-    case .partial: return Pill(text: "Partial \(status.routes.count)/\(status.expected)", color: .yellow, symbol: "exclamationmark.triangle.fill")
-    case .failed: return Pill(text: "Failed", color: .red, symbol: "xmark.circle.fill")
-    case .waiting: return Pill(text: "Waiting", color: .blue, symbol: "hourglass")
-    case .disabled: return Pill(text: "Disabled", color: .secondary, symbol: "pause.circle")
+    case .applied: return Pill(text: L10n.tr("Active · %lld", status.routes.count), color: .green, symbol: "checkmark.circle.fill")
+    case .partial: return Pill(text: L10n.tr("Partial %lld/%lld", status.routes.count, status.expected), color: .yellow, symbol: "exclamationmark.triangle.fill")
+    case .failed: return Pill(text: L10n.tr("Failed"), color: .red, symbol: "xmark.circle.fill")
+    case .waiting: return Pill(text: L10n.tr("Waiting"), color: .blue, symbol: "hourglass")
+    case .disabled: return Pill(text: L10n.tr("Disabled"), color: .secondary, symbol: "pause.circle")
     }
 }
 
 func formatRate(_ bytesPerSecond: Double?) -> String {
     guard let b = bytesPerSecond else { return "—" }
-    return ByteCountFormatter.string(fromByteCount: Int64(b), countStyle: .binary) + "/s"
+    return ByteCountFormatter.string(fromByteCount: Int64(b), countStyle: .binary) + L10n.tr("/s")
 }
 
 func formatBytes(_ v: UInt64) -> String { ByteCountFormatter.string(fromByteCount: Int64(v), countStyle: .binary) }

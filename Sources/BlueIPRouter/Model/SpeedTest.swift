@@ -25,7 +25,9 @@ struct SpeedServer: Hashable, Identifiable, Sendable {
     var basePath: String
     var engine: SpeedEngine
 
-    static let cloudflare = SpeedServer(name: "Cloudflare (nearest location)", host: "speed.cloudflare.com", basePath: "/", engine: .cloudflare)
+    static var cloudflare: SpeedServer {
+        SpeedServer(name: L10n.tr("Cloudflare (nearest location)"), host: "speed.cloudflare.com", basePath: "/", engine: .cloudflare)
+    }
 
     func downloadPath(bytes: Int) -> String {
         switch engine {
@@ -347,7 +349,7 @@ final class SpeedTestRunner {
             } else if let best = await fastest(libreServers.prefix(24), interface: iface) {
                 server = best
             } else {
-                fail("No LibreSpeed server answered on this path.")
+                fail(L10n.tr("No LibreSpeed server answered on this path."))
                 return
             }
         }
@@ -363,7 +365,7 @@ final class SpeedTestRunner {
             if let p = await SpeedIO.ping(server: server, interface: iface) { pings.append(p) }
             progress = Double(i + 1) / 10
         }
-        guard !pings.isEmpty else { fail("The server did not answer on \(path.title). This path may have no internet access."); return }
+        guard !pings.isEmpty else { fail(L10n.tr("The server did not answer on %@. This path may have no internet access.", path.title)); return }
         pingMs = pings.sorted()[pings.count / 2]
         jitterMs = zip(pings, pings.dropFirst()).map { abs($0 - $1) }.reduce(0, +) / Double(max(1, pings.count - 1))
 
@@ -389,7 +391,7 @@ final class SpeedTestRunner {
 
         identity = await identityTask.value
         if down.bytes == 0 && up.bytes == 0 {
-            fail(down.error ?? up.error ?? "No data could be transferred on this path.")
+            fail(down.error ?? up.error ?? L10n.tr("No data could be transferred on this path."))
             return
         }
         phase = .done
