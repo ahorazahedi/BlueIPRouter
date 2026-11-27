@@ -237,11 +237,11 @@ public enum NetworkFacts {
         }
     }
 
-    public static let vpnCoreNames = ["xray", "sing-box", "v2ray", "happd", "hiddify", "clash", "mihomo", "tun2socks", "trojan", "hysteria", "openvpn", "wireguard"]
+    public static let vpnCoreNames = ["xray", "sing-box", "v2ray", "happd", "hiddify", "clash", "mihomo", "tun2socks", "trojan", "hysteria", "openvpn", "wireguard", "thronecore"]
 
     /// Remote IPs that VPN cores are connected to (needs root to see processes owned by root).
     public static func vpnServerPeers() -> [String: [String]] {
-        let out = Shell.run("/usr/sbin/lsof", ["-nP", "-i"], timeout: 15).stdout
+        let out = Shell.run("/usr/sbin/lsof", ["+c", "0", "-nP", "-i"], timeout: 15).stdout
         var map: [String: Set<String>] = [:]
         for line in out.split(separator: "\n").dropFirst() {
             let cols = line.split(separator: " ", omittingEmptySubsequences: true).map(String.init)

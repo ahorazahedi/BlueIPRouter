@@ -77,6 +77,11 @@ func removeRoute(_ old: ManagedRoute, reason: String) -> Bool {
 
 func pfIsEnabled() -> Bool { pfctl(["-s", "info"]).combined.contains("Status: Enabled") }
 
+func pfAnchorHasRules() -> Bool {
+    let r = pfctl(["-a", BIR.pfAnchor, "-s", "rules"])
+    return r.ok && !r.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+}
+
 func ensurePFEnabled() -> Bool {
     if pfIsEnabled() { return true }
     let r = pfctl(["-E"])
@@ -186,8 +191,10 @@ func applyFirewall(routes: [ManagedRoute], interfaces: [InterfaceSnapshot], cach
                                           dnsServers: dns, allowDHCP: cfg.allowDHCP, killSwitch: ksEnabled, denied: denied)
     let previous = try? String(contentsOfFile: BIR.pfRules, encoding: .utf8)
     let changed = previous.map { $0.split(separator: "\n").dropFirst() != text.split(separator: "\n").dropFirst() } ?? true
+    let expectsRules = !denied.isEmpty || (ksEnabled && !ifs.isEmpty && (cfg.mode == .fullSystem || !blocked.isEmpty))
+    let needsReload = changed || !pfIsEnabled() || (expectsRules && !pfAnchorHasRules())
     var pfOK = true
-    if changed || !pfIsEnabled() {
+    if needsReload {
         do {
             try text.write(toFile: BIR.pfRules, atomically: true, encoding: .utf8)
             chmod(BIR.pfRules, 0o644)
@@ -197,11 +204,17 @@ func applyFirewall(routes: [ManagedRoute], interfaces: [InterfaceSnapshot], cach
             pfOK = false
             errors.append("pfctl rejected the rules: \(load.combined)")
             log("firewall load failed: \(load.combined)")
+        } else if expectsRules && !pfAnchorHasRules() {
+            pfOK = false
+            errors.append("pfctl did not retain rules in \(BIR.pfAnchor)")
+            log("firewall load failed: \(BIR.pfAnchor) is empty after reload")
         } else if changed {
             var parts: [String] = []
             if !denied.isEmpty { parts.append("block list \(denied.count) ranges") }
             if ksEnabled { parts.append("kill switch \(cfg.mode.rawValue) on \(ifs.joined(separator: ", "))") }
             log("firewall loaded: \(parts.joined(separator: "; "))")
+        } else {
+            log("firewall reloaded into \(BIR.pfAnchor) (kernel state was cleared)")
         }
     }
     let enabled = pfOK && ensurePFEnabled()
